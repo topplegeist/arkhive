@@ -3,6 +3,7 @@ package engines
 import (
 	"bytes"
 	"crypto/sha1"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -13,6 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DatabaseEngine struct {
@@ -29,15 +31,15 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 		log.Fatal(err)
 		return
 	}
-	storedEncryptedDBHashString := instance.getStoredEncryptedDBHash()
-	var storedEncryptedDBHash []byte
-	if storedEncryptedDBHashString != "" {
-		if storedEncryptedDBHash, err = base64.URLEncoding.DecodeString(storedEncryptedDBHashString); err != nil {
-			log.Fatal("Cannot decode the stored encrypted database hash")
+	storedDBHashString := instance.getStoredDBHash()
+	var storedDBHash []byte
+	if storedDBHashString != "" {
+		if storedDBHash, err = base64.URLEncoding.DecodeString(storedDBHashString); err != nil {
+			log.Fatal("Cannot decode the stored database hash")
 			return
 		}
 	} else {
-		log.Debug("Cannot get the stored encrypted database hash")
+		log.Debug("Cannot get the stored database hash")
 	}
 
 	const cryptedDbFile = "db.bee"
@@ -49,19 +51,24 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 	plainDbFileExists := !os.IsNotExist(existenceFlag)
 	_, existenceFlag = os.Stat(keyFilePath)
 	keyFileExists := !os.IsNotExist(existenceFlag)
+	hashHasBeenCalculated := len(storedDBHash) > 0
 
 	canDecrypt := cryptedDbFileExists && keyFileExists
+	plainAlreadyLoaded := plainDbFileExists && hashHasBeenCalculated
 	if canDecrypt {
-		var encryptedDBData []byte
-		if encryptedDBData, err = os.ReadFile(cryptedDbFile); err != nil {
-			log.Fatal(err)
-			return
+		var encryptedDBHash []byte
+		if hashHasBeenCalculated {
+			var encryptedDBData []byte
+			if encryptedDBData, err = os.ReadFile(cryptedDbFile); err != nil {
+				log.Fatal(err)
+				return
+			}
+			hashEncoder := sha1.New()
+			hashEncoder.Write(encryptedDBData)
+			encryptedDBHash = hashEncoder.Sum(nil)
 		}
-		hashEncoder := sha1.New()
-		hashEncoder.Write(encryptedDBData)
-		encryptedDBHash := hashEncoder.Sum(nil)
 
-		if !reflect.DeepEqual(storedEncryptedDBHash, encryptedDBHash) {
+		if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
 			var privateKey []byte
 			if privateKey, err = os.ReadFile(keyFilePath); err != nil {
 				log.Fatal(err)
@@ -85,24 +92,33 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 				return
 			}
 		}
-	} else if plainDbFileExists {
+	} else if !plainAlreadyLoaded {
 		var dbData []byte
 		if dbData, err = os.ReadFile(plainDbFile); err != nil {
 			log.Fatal(err)
 			return
 		}
 
-		decoder := json.NewDecoder(bytes.NewReader(dbData))
-		decoder.UseNumber()
-		var db map[string]interface{}
-		if err = decoder.Decode(&db); err != nil {
-			log.Fatal(err)
-			return
+		hashEncoder := sha1.New()
+		hashEncoder.Write(dbData)
+		plainDBHash := hashEncoder.Sum(nil)
+
+		if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, plainDBHash) {
+			decoder := json.NewDecoder(bytes.NewReader(dbData))
+			decoder.UseNumber()
+			var db map[string]interface{}
+			if err = decoder.Decode(&db); err != nil {
+				log.Fatal(err)
+				return
+			}
+			if err = instance.storeDecryptedDB(db); err != nil {
+				log.Fatal(err)
+				return
+			}
 		}
-		if err = instance.storeDecryptedDB(db); err != nil {
-			log.Fatal(err)
-			return
-		}
+
+		storingDBHash := base64.URLEncoding.EncodeToString(plainDBHash)
+		instance.setStoredDBHash(storingDBHash)
 	}
 	return
 }
@@ -117,19 +133,32 @@ func (databaseEngine *DatabaseEngine) connectToDatabase() bool {
 func (databaseEngine DatabaseEngine) applyMigrations() (err error) {
 	err = databaseEngine.database.AutoMigrate(&models.User{},
 		&models.Chat{}, &models.Tool{}, &models.Console{}, &models.Game{},
-		&models.ToolFileType{}, &models.ConsoleFileType{}, &models.ConsoleLanguage{},
+		&models.ToolFilesType{}, &models.ConsoleFileType{}, &models.ConsoleLanguage{},
 		&models.ConsolePlugin{}, &models.ConsolePluginsFile{},
 		&models.ConsoleConfig{}, &models.GameDisk{}, &models.GameAdditionalFile{},
 		&models.GameConfig{}, &models.UserVariable{})
 	return
 }
 
-func (databaseEngine DatabaseEngine) getStoredEncryptedDBHash() string {
+func (databaseEngine DatabaseEngine) getStoredDBHash() string {
 	var userVariable models.UserVariable
 	if result := databaseEngine.database.First(&userVariable, "name = ?", "dbHash"); result.Error != nil || !userVariable.Value.Valid {
 		return ""
 	}
 	return userVariable.Value.String
+}
+
+func (databaseEngine DatabaseEngine) setStoredDBHash(dbHash string) {
+	userVariable := models.UserVariable{
+		Name: "dbHash",
+		Value: sql.NullString{
+			String: dbHash,
+			Valid:  true,
+		},
+	}
+	databaseEngine.database.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&userVariable)
 }
 
 func (databaseEngine DatabaseEngine) storeDecryptedDB(database map[string]interface{}) (err error) {
@@ -284,5 +313,21 @@ func (databaseEngine DatabaseEngine) storeDecryptedGames(gamesJson map[string]in
 }
 
 func (databaseEngine DatabaseEngine) storeDecryptedTools(toolsJson map[string]interface{}) (err error) {
+	for toolKey, toolValue := range toolsJson {
+		var tool *models.Tool
+		if tool, err = models.ToolFromJSON(toolKey, toolsJson[toolKey]); err != nil {
+			return
+		}
+		databaseEngine.database.Create(tool)
+		if toolFileTypesObject, ok := toolValue.(map[string]interface{})["file_types"].([]interface{}); ok {
+			for _, toolFileTypeObject := range toolFileTypesObject {
+				var toolFileType *models.ToolFilesType
+				if toolFileType, err = models.ToolFilesTypeFromJSON(tool, toolFileTypeObject); err != nil {
+					return
+				}
+				databaseEngine.database.Create(toolFileType)
+			}
+		}
+	}
 	return
 }

@@ -1,6 +1,7 @@
 package engines
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
@@ -90,11 +91,18 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 			log.Fatal(err)
 			return
 		}
+
+		decoder := json.NewDecoder(bytes.NewReader(dbData))
+		decoder.UseNumber()
 		var db map[string]interface{}
-		if err = json.Unmarshal(dbData, &db); err != nil {
+		if err = decoder.Decode(&db); err != nil {
+			log.Fatal(err)
 			return
 		}
-		instance.storeDecryptedDB(db)
+		if err = instance.storeDecryptedDB(db); err != nil {
+			log.Fatal(err)
+			return
+		}
 	}
 	return
 }
@@ -118,7 +126,7 @@ func (databaseEngine DatabaseEngine) applyMigrations() (err error) {
 
 func (databaseEngine DatabaseEngine) getStoredEncryptedDBHash() string {
 	var userVariable models.UserVariable
-	if result := databaseEngine.database.First(&userVariable, "dbHash"); result.Error != nil || !userVariable.Value.Valid {
+	if result := databaseEngine.database.First(&userVariable, "name = ?", "dbHash"); result.Error != nil || !userVariable.Value.Valid {
 		return ""
 	}
 	return userVariable.Value.String
@@ -224,10 +232,57 @@ func (databaseEngine DatabaseEngine) storeDecryptedConsoles(consolesJson map[str
 	return
 }
 
-func (databaseEngine DatabaseEngine) storeDecryptedGames(database map[string]interface{}) (err error) {
+func (databaseEngine DatabaseEngine) storeDecryptedGames(gamesJson map[string]interface{}) (err error) {
+	for gameKey, gameValue := range gamesJson {
+		var console models.Console
+		gameObject := gameValue.(map[string]interface{})
+		if result := databaseEngine.database.First(&console, "slug = ?", gameObject["console_slug"].(string)); result.Error != nil {
+			err = result.Error
+			return
+		}
+		var game *models.Game
+		if game, err = models.GameFromJSON(gameKey, &console, gameValue); err != nil {
+			return
+		}
+		databaseEngine.database.Create(game)
+		collectionPath := gameObject["collection_path"]
+		var gameDisk *models.GameDisk
+		if gameUrls, ok := gameObject["url"].([]interface{}); ok {
+			for diskNumber := 0; diskNumber < len(gameUrls); diskNumber++ {
+				gameDiskImage := gameObject["disk_image"].([]interface{})[diskNumber]
+				if gameDisk, err = models.GameDiskFromJSON(game, uint(diskNumber), gameUrls[diskNumber], gameDiskImage, collectionPath); err != nil {
+					return
+				}
+				databaseEngine.database.Create(gameDisk)
+			}
+		} else {
+			if gameDisk, err = models.GameDiskFromJSON(game, 0, gameObject["url"], nil, collectionPath); err != nil {
+				return
+			}
+			databaseEngine.database.Create(gameDisk)
+		}
+		if gameConfigObject, ok := gameObject["config"].(map[string]interface{}); ok {
+			for configKey, configValue := range gameConfigObject {
+				var gameConfig *models.GameConfig
+				if gameConfig, err = models.GameConfigFromJSON(game, configKey, configValue); err != nil {
+					return
+				}
+				databaseEngine.database.Create(gameConfig)
+			}
+		}
+		if gameAdditionlFilesObject, ok := gameObject["additional_files"].([]interface{}); ok {
+			for _, gameAdditionlFileObject := range gameAdditionlFilesObject {
+				var gameAdditionalFile *models.GameAdditionalFile
+				if gameAdditionalFile, err = models.GameAdditionalFileFromJSON(game, gameAdditionlFileObject); err != nil {
+					return
+				}
+				databaseEngine.database.Create(gameAdditionalFile)
+			}
+		}
+	}
 	return
 }
 
-func (databaseEngine DatabaseEngine) storeDecryptedTools(database map[string]interface{}) (err error) {
+func (databaseEngine DatabaseEngine) storeDecryptedTools(toolsJson map[string]interface{}) (err error) {
 	return
 }

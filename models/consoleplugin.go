@@ -6,3 +6,13 @@ type ConsolePlugin struct {
 	Console   Console
 	Type      string `gorm:"not null"`
 }
+
+func ConsolePluginFromJSON(typeString string, consoleEntry *Console) (instance *ConsolePlugin, err error) {
+	instance = &ConsolePlugin{
+		0,
+		"",
+		*consoleEntry,
+		typeString,
+	}
+	return
+}

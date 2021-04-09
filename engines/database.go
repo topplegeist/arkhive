@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strconv"
 
+	"arkhive.dev/launcher/common"
 	"arkhive.dev/launcher/models"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
@@ -19,107 +20,116 @@ import (
 
 type DatabaseEngine struct {
 	database *gorm.DB
+
+	// Event emitters
+	InitializationEndEventEmitter common.EventEmitter
+	DecryptedEventEmitter         common.EventEmitter
 }
 
 func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 	instance = new(DatabaseEngine)
-	if ok := instance.connectToDatabase(); !ok {
-		log.Fatal("Cannot open database")
-		return
-	}
-	if err = instance.applyMigrations(); err != nil {
-		log.Fatal(err)
-		return
-	}
-	storedDBHashString := instance.getStoredDBHash()
-	var storedDBHash []byte
-	if storedDBHashString != "" {
-		if storedDBHash, err = base64.URLEncoding.DecodeString(storedDBHashString); err != nil {
-			log.Fatal("Cannot decode the stored database hash")
+
+	go func() {
+		if ok := instance.connectToDatabase(); !ok {
+			log.Fatal("Cannot open database")
 			return
 		}
-	} else {
-		log.Debug("Cannot get the stored database hash")
-	}
-
-	const cryptedDbFile = "db.bee"
-	const plainDbFile = "db.json"
-	const keyFilePath = "private_key.bee"
-	_, existenceFlag := os.Stat(cryptedDbFile)
-	cryptedDbFileExists := !os.IsNotExist(existenceFlag)
-	_, existenceFlag = os.Stat(plainDbFile)
-	plainDbFileExists := !os.IsNotExist(existenceFlag)
-	_, existenceFlag = os.Stat(keyFilePath)
-	keyFileExists := !os.IsNotExist(existenceFlag)
-	hashHasBeenCalculated := len(storedDBHash) > 0
-
-	canDecrypt := cryptedDbFileExists && keyFileExists
-	plainAlreadyLoaded := plainDbFileExists && hashHasBeenCalculated
-	if canDecrypt {
-		var encryptedDBHash []byte
-		if hashHasBeenCalculated {
-			var encryptedDBData []byte
-			if encryptedDBData, err = os.ReadFile(cryptedDbFile); err != nil {
-				log.Fatal(err)
-				return
-			}
-			hashEncoder := sha1.New()
-			hashEncoder.Write(encryptedDBData)
-			encryptedDBHash = hashEncoder.Sum(nil)
-		}
-
-		if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
-			var privateKey []byte
-			if privateKey, err = os.ReadFile(keyFilePath); err != nil {
-				log.Fatal(err)
-				return
-			}
-			if privateKey, err = base64.URLEncoding.DecodeString(string(privateKey)); err != nil {
-				log.Fatal("Cannot decode the stored encrypted database hash")
-				return
-			}
-			var encryptedDBData []byte
-			if encryptedDBData, err = os.ReadFile(cryptedDbFile); err != nil {
-				log.Fatal(err)
-				return
-			}
-			if encryptedDBData, err = base64.URLEncoding.DecodeString(string(encryptedDBData)); err != nil {
-				log.Fatal("Cannot decode the stored encrypted database hash")
-				return
-			}
-			if _, err = decode(encryptedDBData, privateKey); err != nil {
-				log.Fatal("Cannot decode the encrypted database")
-				return
-			}
-		}
-	} else if !plainAlreadyLoaded {
-		var dbData []byte
-		if dbData, err = os.ReadFile(plainDbFile); err != nil {
+		if err = instance.applyMigrations(); err != nil {
 			log.Fatal(err)
 			return
 		}
-
-		hashEncoder := sha1.New()
-		hashEncoder.Write(dbData)
-		plainDBHash := hashEncoder.Sum(nil)
-
-		if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, plainDBHash) {
-			decoder := json.NewDecoder(bytes.NewReader(dbData))
-			decoder.UseNumber()
-			var db map[string]interface{}
-			if err = decoder.Decode(&db); err != nil {
-				log.Fatal(err)
+		storedDBHashString := instance.getStoredDBHash()
+		var storedDBHash []byte
+		if storedDBHashString != "" {
+			if storedDBHash, err = base64.URLEncoding.DecodeString(storedDBHashString); err != nil {
+				log.Fatal("Cannot decode the stored database hash")
 				return
 			}
-			if err = instance.storeDecryptedDB(db); err != nil {
-				log.Fatal(err)
-				return
-			}
+		} else {
+			log.Debug("Cannot get the stored database hash")
 		}
 
-		storingDBHash := base64.URLEncoding.EncodeToString(plainDBHash)
-		instance.setStoredDBHash(storingDBHash)
-	}
+		const cryptedDbFile = "db.bee"
+		const plainDbFile = "db.json"
+		const keyFilePath = "private_key.bee"
+		_, existenceFlag := os.Stat(cryptedDbFile)
+		cryptedDbFileExists := !os.IsNotExist(existenceFlag)
+		_, existenceFlag = os.Stat(plainDbFile)
+		plainDbFileExists := !os.IsNotExist(existenceFlag)
+		_, existenceFlag = os.Stat(keyFilePath)
+		keyFileExists := !os.IsNotExist(existenceFlag)
+		hashHasBeenCalculated := len(storedDBHash) > 0
+
+		canDecrypt := cryptedDbFileExists && keyFileExists
+		plainAlreadyLoaded := plainDbFileExists && hashHasBeenCalculated
+		if canDecrypt {
+			var encryptedDBHash []byte
+			if hashHasBeenCalculated {
+				var encryptedDBData []byte
+				if encryptedDBData, err = os.ReadFile(cryptedDbFile); err != nil {
+					log.Fatal(err)
+					return
+				}
+				hashEncoder := sha1.New()
+				hashEncoder.Write(encryptedDBData)
+				encryptedDBHash = hashEncoder.Sum(nil)
+			}
+
+			if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
+				var privateKey []byte
+				if privateKey, err = os.ReadFile(keyFilePath); err != nil {
+					log.Fatal(err)
+					return
+				}
+				if privateKey, err = base64.URLEncoding.DecodeString(string(privateKey)); err != nil {
+					log.Fatal("Cannot decode the stored encrypted database hash")
+					return
+				}
+				var encryptedDBData []byte
+				if encryptedDBData, err = os.ReadFile(cryptedDbFile); err != nil {
+					log.Fatal(err)
+					return
+				}
+				if encryptedDBData, err = base64.URLEncoding.DecodeString(string(encryptedDBData)); err != nil {
+					log.Fatal("Cannot decode the stored encrypted database hash")
+					return
+				}
+				if _, err = decode(encryptedDBData, privateKey); err != nil {
+					log.Fatal("Cannot decode the encrypted database")
+					return
+				}
+			}
+		} else if !plainAlreadyLoaded {
+			var dbData []byte
+			if dbData, err = os.ReadFile(plainDbFile); err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			hashEncoder := sha1.New()
+			hashEncoder.Write(dbData)
+			plainDBHash := hashEncoder.Sum(nil)
+
+			if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, plainDBHash) {
+				decoder := json.NewDecoder(bytes.NewReader(dbData))
+				decoder.UseNumber()
+				var db map[string]interface{}
+				if err = decoder.Decode(&db); err != nil {
+					log.Fatal(err)
+					return
+				}
+				if err = instance.storeDecryptedDB(db); err != nil {
+					log.Fatal(err)
+					return
+				}
+			}
+
+			storingDBHash := base64.URLEncoding.EncodeToString(plainDBHash)
+			instance.setStoredDBHash(storingDBHash)
+		}
+		instance.InitializationEndEventEmitter.Emit(true)
+	}()
+	instance.InitializationEndEventEmitter.Subscribe(instance.databaseDecryptFutureFinished)
 	return
 }
 
@@ -330,4 +340,10 @@ func (databaseEngine DatabaseEngine) storeDecryptedTools(toolsJson map[string]in
 		}
 	}
 	return
+}
+
+func (databaseEngine DatabaseEngine) databaseDecryptFutureFinished(hasBeenInitializated bool) {
+	if hasBeenInitializated {
+		databaseEngine.DecryptedEventEmitter.Emit(true)
+	}
 }

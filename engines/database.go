@@ -22,12 +22,14 @@ type DatabaseEngine struct {
 	database *gorm.DB
 
 	// Event emitters
-	InitializationEndEventEmitter common.EventEmitter
-	DecryptedEventEmitter         common.EventEmitter
+	InitializationEndEventEmitter *common.EventEmitter
+	DecryptedEventEmitter         *common.EventEmitter
 }
 
 func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 	instance = new(DatabaseEngine)
+	instance.InitializationEndEventEmitter = new(common.EventEmitter)
+	instance.DecryptedEventEmitter = new(common.EventEmitter)
 
 	go func() {
 		if ok := instance.connectToDatabase(); !ok {

@@ -11,8 +11,10 @@ type EventEmitter struct {
 }
 
 func (eventEmitter *EventEmitter) Emit(message interface{}) error {
-	if eventEmitter.messagesType == nil {
+	if eventEmitter.messagesType == nil && len(eventEmitter.subscribers) > 0 {
 		return errors.New("no event emitter message type")
+	} else if len(eventEmitter.subscribers) == 0 {
+		return nil
 	}
 	if reflect.TypeOf(message) != eventEmitter.messagesType {
 		panic("Emitting wrong data type, expected '" + eventEmitter.messagesType.Name() + "'")
@@ -24,7 +26,6 @@ func (eventEmitter *EventEmitter) Emit(message interface{}) error {
 }
 
 func (eventEmitter *EventEmitter) Subscribe(callback interface{}) {
-	// ToDo check callback
 	callbackType := reflect.TypeOf(callback)
 	if callbackType.Kind() != reflect.Func {
 		panic("Callback is not a function")
@@ -51,8 +52,8 @@ type Subscriber struct {
 
 func newSubscriber(messagesType reflect.Type) *Subscriber {
 	instance := new(Subscriber)
-	ctype := reflect.ChanOf(reflect.BothDir, messagesType)
-	instance.inputQueue = reflect.MakeChan(ctype, 1)
+	channelType := reflect.ChanOf(reflect.BothDir, messagesType)
+	instance.inputQueue = reflect.MakeChan(channelType, 1)
 	go func() {
 		for {
 			if message, ok := instance.inputQueue.Recv(); ok {

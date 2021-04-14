@@ -6,8 +6,11 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"os"
 	"path"
+	"path/filepath"
+	"reflect"
 	"time"
 
 	"arkhive.dev/launcher/common"
@@ -31,29 +34,27 @@ type NetworkEngine struct {
 	account           network.Account
 	resources         []*network.Resource
 	certificateStatus CertificateStatus
+	undertowPublicKey *rsa.PublicKey
 
 	// Signals
-	UserAccountAvailable      *common.EventEmitter
-	UserStatusChanged         *common.EventEmitter
-	Booted                    *common.EventEmitter
-	NetworkProcessInitialized *common.EventEmitter
+	UserAccountAvailableEventEmitter      *common.EventEmitter
+	UserStatusChangedEventEmitter         *common.EventEmitter
+	BootedEventEmitter                    *common.EventEmitter
+	NetworkProcessInitializedEventEmitter *common.EventEmitter
 }
 
 func NewNetworkEngine(databaseEngine *DatabaseEngine, undertowResource network.StorjResource) (instance *NetworkEngine, err error) {
 	instance = &NetworkEngine{
-		databaseEngine:            databaseEngine,
-		undertowResource:          undertowResource,
-		UserAccountAvailable:      new(common.EventEmitter),
-		UserStatusChanged:         new(common.EventEmitter),
-		Booted:                    new(common.EventEmitter),
-		NetworkProcessInitialized: new(common.EventEmitter),
+		databaseEngine:                        databaseEngine,
+		undertowResource:                      undertowResource,
+		UserAccountAvailableEventEmitter:      new(common.EventEmitter),
+		UserStatusChangedEventEmitter:         new(common.EventEmitter),
+		BootedEventEmitter:                    new(common.EventEmitter),
+		NetworkProcessInitializedEventEmitter: new(common.EventEmitter),
 	}
 
 	if _, err := os.Stat(common.SYSTEM_FOLDER_PATH); os.IsNotExist(err) {
 		os.Mkdir(common.SYSTEM_FOLDER_PATH, 0755)
-	}
-	if _, err := os.Stat(common.TEMP_DOWNLOAD_FOLDER_PATH); os.IsNotExist(err) {
-		os.Mkdir(common.TEMP_DOWNLOAD_FOLDER_PATH, 0755)
 	}
 
 	go instance.importUserCryptoData()
@@ -66,7 +67,7 @@ func NewNetworkEngine(databaseEngine *DatabaseEngine, undertowResource network.S
 }
 
 func (networkEngine NetworkEngine) isUserCertificateAvailable() bool {
-	return networkEngine.certificateStatus == OFFICIAL
+	return networkEngine.certificateStatus != INVALID
 }
 
 func (networkEngine *NetworkEngine) importUserCryptoData() (err error) {
@@ -86,13 +87,17 @@ func (networkEngine *NetworkEngine) importUserCryptoData() (err error) {
 		var privateKey *rsa.PrivateKey
 		if privateKey, err = parsePrivateKey(privateKeyBytes); err != nil {
 			log.Fatal("Cannot decode the private key file content")
+			log.Fatal(err)
 			return
 		}
 		networkEngine.account.PrivateKey = *privateKey
 		if readCertificateError := networkEngine.readAccountCertificate(); readCertificateError == nil {
 			networkEngine.certificateStatus = AVAILABLE
-			networkEngine.UserAccountAvailable.Emit(true)
-			networkEngine.UserStatusChanged.Emit(true)
+			networkEngine.UserAccountAvailableEventEmitter.Emit(true)
+			networkEngine.UserStatusChangedEventEmitter.Emit(true)
+		} else {
+			log.Warn("Error reading the user certificate")
+			log.Error(err)
 		}
 	}
 
@@ -110,14 +115,11 @@ func (networkEngine *NetworkEngine) importUserCryptoData() (err error) {
 		networkEngine.account.PublicKey = privateKey.PublicKey
 	}
 
-	networkEngine.Booted.Emit(true)
+	networkEngine.BootedEventEmitter.Emit(true)
 	return
 }
 
 func (networkEngine *NetworkEngine) initNetworkProcess() {
-	// ToDo: Setup client parameters
-	// defer networkEngine.session.Close()
-	// ToDo: Load session resume data
 	networkEngine.addUndertow(&networkEngine.undertowResource, true)
 }
 
@@ -161,15 +163,98 @@ func (networkEngine NetworkEngine) readAccountCertificate() (err error) {
 	return
 }
 
+func (networkEngine NetworkEngine) verifyAccountCertificateSign() (err error) {
+	if networkEngine.undertowPublicKey == nil {
+		return errors.New("undertow file not downloaded")
+	}
+	if !networkEngine.isUserCertificateAvailable() {
+		return errors.New("unextistent certificate file")
+	}
+
+	certificateFilePath := path.Join(common.SYSTEM_FOLDER_PATH, "certificate.bee")
+	_, err = os.Stat(certificateFilePath)
+	certificateFileExists := !os.IsNotExist(err)
+	if !certificateFileExists {
+		return
+	}
+	var jsonCertificateData []byte
+	if jsonCertificateData, err = os.ReadFile(certificateFilePath); err != nil {
+		log.Fatal(err)
+		return
+	}
+	decoder := json.NewDecoder(bytes.NewReader(jsonCertificateData))
+	decoder.UseNumber()
+	var jsonCertificateDocument map[string]interface{}
+	if err = decoder.Decode(&jsonCertificateDocument); err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	if signBase64, ok := jsonCertificateDocument["sign"].(string); ok {
+		if networkEngine.account.Sign, err = base64.URLEncoding.DecodeString(signBase64); err != nil {
+			log.Fatal(err)
+			return
+		}
+	}
+	networkEngine.certificateStatus = UNOFFICIAL
+
+	jsonCertificateDocumentDecoded := make(map[string]interface{})
+	var ok bool = true
+	if ok {
+		jsonCertificateDocumentDecoded["username"], ok = jsonCertificateDocument["username"].(string)
+	}
+	if ok {
+		jsonCertificateDocumentDecoded["email"], ok = jsonCertificateDocument["email"].(string)
+	}
+	if jsonCertificateDocumentDecoded["date"], err = jsonCertificateDocument["date"].(json.Number).Int64(); err != nil {
+		ok = false
+	}
+	if ok {
+		jsonCertificateDocumentDecoded["public_key"], ok = jsonCertificateDocument["public_key"].(string)
+	}
+	if !ok {
+		err = errors.New("invalid certificate values")
+		return
+	}
+	var jsonCertificateDocumentDecodedEncrypted []byte
+	if jsonCertificateDocumentDecodedEncrypted, err = Encrypt(networkEngine.undertowPublicKey, jsonCertificateData); err != nil {
+		if reflect.DeepEqual(networkEngine.account.Sign, jsonCertificateDocumentDecodedEncrypted) {
+			networkEngine.certificateStatus = OFFICIAL
+		}
+	}
+	return
+}
+
 func (networkEngine *NetworkEngine) addUndertow(storjResource *network.StorjResource, isMain bool) error {
 	systemPath := common.SYSTEM_FOLDER_PATH
 	resource := network.NewResource(storjResource, systemPath, []string{})
 	networkEngine.resources = append(networkEngine.resources, resource)
-	resource.StatusUpdatedEventEmitter.Subscribe(func(status network.ResourceStatus) {
-		log.Debug(resource.Path, ": Undertow status updated ", resource.Status)
+	resource.StatusUpdatedEventEmitter.Subscribe(func(resource *network.Resource) {
+		url := resource.Handler.GetURL()
+		log.Debug(url.String(), ": Undertow status updated ", resource.Status)
 	})
-	resource.AvailableEventEmitter.Subscribe(func(_ bool) {
-		networkEngine.NetworkProcessInitialized.Emit(true)
+	resource.ProgressUpdatedEventEmitter.Subscribe(func(resource *network.Resource) {
+		url := resource.Handler.GetURL()
+		log.Debug(url.String(),
+			": Undertow download progress ",
+			resource.Available, "/", resource.Total,
+			" (", resource.Available/resource.Total*100, "%)")
+	})
+	resource.AvailableEventEmitter.Subscribe(func(resource *network.Resource) {
+		var (
+			undertowPublicKeyBytes []byte
+			err                    error
+		)
+		if undertowPublicKeyBytes, err = os.ReadFile(path.Join(resource.Path, filepath.Base(resource.Handler.GetURL().Path))); err != nil {
+			log.Error(err)
+			return
+		}
+		if networkEngine.undertowPublicKey, err = parsePublicKey(undertowPublicKeyBytes); err != nil {
+			log.Error(err)
+			return
+		}
+		networkEngine.UserStatusChangedEventEmitter.Emit(true)
+		networkEngine.verifyAccountCertificateSign()
 	})
 	go func() {
 		userAccess, err := uplink.ParseAccess(storjResource.Access)
@@ -185,21 +270,25 @@ func (networkEngine *NetworkEngine) addUndertow(storjResource *network.StorjReso
 			return
 		}
 		resource.SetStatus(network.DOWNLOADING)
-		stat, err := project.StatObject(context.Background(), resource.Handler.GetURL().Host, resource.Handler.GetURL().Path)
+		stat, err := project.StatObject(context.Background(),
+			resource.Handler.GetURL().Host,
+			resource.Handler.GetURL().Path)
 		if err != nil {
 			resource.SetStatus(network.ERROR)
 			log.Error(err)
 			return
 		}
 		resource.Total = stat.System.ContentLength
-		download, err := project.DownloadObject(context.Background(), resource.Handler.GetURL().Host, resource.Handler.GetURL().Path, nil)
+		download, err := project.DownloadObject(context.Background(),
+			resource.Handler.GetURL().Host,
+			resource.Handler.GetURL().Path, nil)
 		if err != nil {
 			resource.SetStatus(network.ERROR)
 			log.Error(err)
 			return
 		}
 		defer download.Close()
-		resource.Save(download)
+		resource.Download(download)
 		resource.SetStatus(network.DOWNLOADED)
 	}()
 

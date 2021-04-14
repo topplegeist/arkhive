@@ -11,4 +11,5 @@ type Account struct {
 	RegistrationDate time.Time
 	PrivateKey       rsa.PrivateKey
 	PublicKey        rsa.PublicKey
+	Sign             []byte
 }

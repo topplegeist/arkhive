@@ -32,7 +32,7 @@ func main() {
 	networkEngine, _ := engines.NewNetworkEngine(databaseEngine, network.GetUndertow())
 
 	databaseEngine.InitializationEndEventEmitter.Subscribe(stopMain)
-	networkEngine.NetworkProcessInitialized.Subscribe(stopMain2)
+	networkEngine.NetworkProcessInitializedEventEmitter.Subscribe(stopMain2)
 	for !stop || !stop2 {
 		time.Sleep(1 * time.Second)
 	}

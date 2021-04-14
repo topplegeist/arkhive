@@ -2,6 +2,7 @@ package engines
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"crypto/sha1"
 	"database/sql"
 	"encoding/base64"
@@ -40,18 +41,19 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 			log.Fatal(err)
 			return
 		}
-		storedDBHashString := instance.getStoredDBHash()
+
 		var storedDBHash []byte
-		if storedDBHashString != "" {
+		if storedDBHashString := instance.getStoredDBHash(); storedDBHashString != "" {
 			if storedDBHash, err = base64.URLEncoding.DecodeString(storedDBHashString); err != nil {
 				log.Fatal("Cannot decode the stored database hash")
+				log.Fatal(err)
 				return
 			}
 		} else {
 			log.Debug("Cannot get the stored database hash")
 		}
 
-		const cryptedDbFile = "db.bee"
+		const cryptedDbFile = "db.honey"
 		const plainDbFile = "db.json"
 		const keyFilePath = "private_key.bee"
 		_, existenceFlag := os.Stat(cryptedDbFile)
@@ -63,12 +65,15 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 		hashHasBeenCalculated := len(storedDBHash) > 0
 
 		canDecrypt := cryptedDbFileExists && keyFileExists
-		plainAlreadyLoaded := plainDbFileExists && hashHasBeenCalculated
+
+		var encryptedDBData []byte
+		var encryptedDBHash []byte
+		var dbData []byte
+
 		if canDecrypt {
-			var encryptedDBHash []byte
 			if hashHasBeenCalculated {
-				var encryptedDBData []byte
 				if encryptedDBData, err = os.ReadFile(cryptedDbFile); err != nil {
+					log.Fatal("Cannot read the encrypted database file")
 					log.Fatal(err)
 					return
 				}
@@ -78,41 +83,36 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 			}
 
 			if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
-				var privateKey []byte
-				if privateKey, err = os.ReadFile(keyFilePath); err != nil {
+				var privateKeyBytes []byte
+				if privateKeyBytes, err = os.ReadFile(keyFilePath); err != nil {
+					log.Fatal("Cannot read the secret key file")
 					log.Fatal(err)
 					return
 				}
-				if privateKey, err = base64.URLEncoding.DecodeString(string(privateKey)); err != nil {
-					log.Fatal("Cannot decode the stored encrypted database hash")
+				var privateKey *rsa.PrivateKey
+				if privateKey, err = parsePrivateKey(privateKeyBytes); err != nil {
+					log.Fatal("Cannot import the private key")
+					log.Fatal(err)
 					return
 				}
 				var encryptedDBData []byte
 				if encryptedDBData, err = os.ReadFile(cryptedDbFile); err != nil {
+					log.Fatal("Cannot read the crypted database")
 					log.Fatal(err)
 					return
 				}
-				if encryptedDBData, err = base64.URLEncoding.DecodeString(string(encryptedDBData)); err != nil {
-					log.Fatal("Cannot decode the stored encrypted database hash")
-					return
-				}
-				if _, err = decode(encryptedDBData, privateKey); err != nil {
+				if dbData, err = Decrypt(privateKey, encryptedDBData); err != nil {
 					log.Fatal("Cannot decode the encrypted database")
+					log.Fatal(err)
 					return
 				}
-			}
-		} else if !plainAlreadyLoaded {
-			var dbData []byte
-			if dbData, err = os.ReadFile(plainDbFile); err != nil {
-				log.Fatal(err)
-				return
-			}
 
-			hashEncoder := sha1.New()
-			hashEncoder.Write(dbData)
-			plainDBHash := hashEncoder.Sum(nil)
+				if !hashHasBeenCalculated {
+					hashEncoder := sha1.New()
+					hashEncoder.Write(encryptedDBData)
+					encryptedDBHash = hashEncoder.Sum(nil)
+				}
 
-			if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, plainDBHash) {
 				decoder := json.NewDecoder(bytes.NewReader(dbData))
 				decoder.UseNumber()
 				var db map[string]interface{}
@@ -124,11 +124,90 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 					log.Fatal(err)
 					return
 				}
+				storingDBHash := base64.URLEncoding.EncodeToString(encryptedDBHash)
+				instance.setStoredDBHash(storingDBHash)
+			}
+		} else if plainDbFileExists {
+			if dbData, err = os.ReadFile(plainDbFile); err != nil {
+				log.Fatal("Cannot read the plain database file")
+				log.Fatal(err)
+				return
 			}
 
-			storingDBHash := base64.URLEncoding.EncodeToString(plainDBHash)
-			instance.setStoredDBHash(storingDBHash)
+			if !keyFileExists {
+				var privateKey *rsa.PrivateKey
+				if privateKey, err = generatePairKey(1024); err != nil {
+					log.Fatal("Cannot generate the key pair")
+					log.Fatal(err)
+					return
+				}
+				privateKeyBytes := exportPrivateKey(privateKey)
+				if err = os.WriteFile(keyFilePath, privateKeyBytes, 0644); err != nil {
+					log.Fatal("Cannot write the private key file")
+					log.Fatal(err)
+					return
+				}
+				var publicKeyBytes []byte
+				if publicKeyBytes, err = exportPublicKey(&privateKey.PublicKey); err != nil {
+					log.Fatal("Cannot export the new undertow public key")
+					log.Fatal(err)
+					return
+				}
+				if err = os.WriteFile("undertow.tow", publicKeyBytes, 0644); err != nil {
+					log.Fatal("Cannot write the temporary undertow file")
+					log.Fatal(err)
+					return
+				}
+			}
+
+			if !cryptedDbFileExists {
+				var privateKeyBytes []byte
+				if privateKeyBytes, err = os.ReadFile(keyFilePath); err != nil {
+					log.Fatal("Cannot read the private key file")
+					log.Fatal(err)
+					return
+				}
+				var privateKey *rsa.PrivateKey
+				if privateKey, err = parsePrivateKey(privateKeyBytes); err != nil {
+					log.Fatal("Cannot import the private key")
+					log.Fatal(err)
+					return
+				}
+				if encryptedDBData, err = Encrypt(&privateKey.PublicKey, dbData); err != nil {
+					log.Fatal("Cannot encrypt the new encrypted database")
+					log.Fatal(err)
+					return
+				}
+				if os.WriteFile(cryptedDbFile, encryptedDBData, 0644); err != nil {
+					log.Fatal("Cannot write the new encrypted database file")
+					log.Fatal(err)
+					return
+				}
+			}
+
+			hashEncoder := sha1.New()
+			hashEncoder.Write(encryptedDBData)
+			encryptedDBHash = hashEncoder.Sum(nil)
+
+			if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
+				decoder := json.NewDecoder(bytes.NewReader(dbData))
+				decoder.UseNumber()
+				var db map[string]interface{}
+				if err = decoder.Decode(&db); err != nil {
+					log.Fatal(err)
+					return
+				}
+				if err = instance.storeDecryptedDB(db); err != nil {
+					log.Fatal(err)
+					return
+				}
+				storingDBHash := base64.URLEncoding.EncodeToString(encryptedDBHash)
+				instance.setStoredDBHash(storingDBHash)
+			}
+		} else if !hashHasBeenCalculated {
+			panic("no database to be imported")
 		}
+
 		instance.InitializationEndEventEmitter.Emit(true)
 	}()
 	instance.InitializationEndEventEmitter.Subscribe(instance.databaseDecryptFutureFinished)

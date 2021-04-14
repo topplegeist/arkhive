@@ -102,7 +102,7 @@ func (networkEngine *NetworkEngine) importUserCryptoData() (err error) {
 			log.Fatal(err)
 			return
 		}
-		if err = os.WriteFile(privateKeyFilePath, exportPrivateKey(privateKey), 0755); err != nil {
+		if err = os.WriteFile(privateKeyFilePath, exportPrivateKey(privateKey), 0644); err != nil {
 			log.Fatal(err)
 			return
 		}

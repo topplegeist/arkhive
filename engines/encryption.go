@@ -3,14 +3,11 @@ package engines
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 )
-
-func decode(ciphertext []byte, privateKey []byte) ([]byte, error) {
-	panic("to be implemented")
-}
 
 func generatePairKey(bitSize int) (*rsa.PrivateKey, error) {
 	reader := rand.Reader
@@ -74,5 +71,53 @@ func parsePublicKey(pubPEM []byte) (*rsa.PublicKey, error) {
 	default:
 		break
 	}
-	return nil, errors.New("Key type is not RSA")
+	return nil, errors.New("key type is not RSA")
+}
+
+func Encrypt(public *rsa.PublicKey, msg []byte) ([]byte, error) {
+	hash := sha256.New()
+	random := rand.Reader
+	msgLen := len(msg)
+	step := public.Size() - 2*hash.Size() - 2
+	var encryptedBytes []byte
+
+	for start := 0; start < msgLen; start += step {
+		finish := start + step
+		if finish > msgLen {
+			finish = msgLen
+		}
+
+		encryptedBlockBytes, err := rsa.EncryptOAEP(hash, random, public, msg[start:finish], nil)
+		if err != nil {
+			return nil, err
+		}
+
+		encryptedBytes = append(encryptedBytes, encryptedBlockBytes...)
+	}
+
+	return encryptedBytes, nil
+}
+
+func Decrypt(private *rsa.PrivateKey, msg []byte) ([]byte, error) {
+	hash := sha256.New()
+	random := rand.Reader
+	msgLen := len(msg)
+	step := private.PublicKey.Size()
+	var decryptedBytes []byte
+
+	for start := 0; start < msgLen; start += step {
+		finish := start + step
+		if finish > msgLen {
+			finish = msgLen
+		}
+
+		decryptedBlockBytes, err := rsa.DecryptOAEP(hash, random, private, msg[start:finish], nil)
+		if err != nil {
+			return nil, err
+		}
+
+		decryptedBytes = append(decryptedBytes, decryptedBlockBytes...)
+	}
+
+	return decryptedBytes, nil
 }

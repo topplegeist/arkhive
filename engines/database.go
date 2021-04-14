@@ -56,6 +56,7 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 		const cryptedDbFile = "db.honey"
 		const plainDbFile = "db.json"
 		const keyFilePath = "private_key.bee"
+		const undertowPath = "undertow.tow"
 		_, existenceFlag := os.Stat(cryptedDbFile)
 		cryptedDbFileExists := !os.IsNotExist(existenceFlag)
 		_, existenceFlag = os.Stat(plainDbFile)
@@ -83,6 +84,9 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 			}
 
 			if !hashHasBeenCalculated || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
+				if hashHasBeenCalculated {
+					log.Info("The encrypted database hash not matches the one stored into the local database. Updating the local database.")
+				}
 				var privateKeyBytes []byte
 				if privateKeyBytes, err = os.ReadFile(keyFilePath); err != nil {
 					log.Fatal("Cannot read the secret key file")
@@ -128,6 +132,7 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 				instance.setStoredDBHash(storingDBHash)
 			}
 		} else if plainDbFileExists {
+			log.Info("The encrypted database cannot be decrypted, proceeding with the plain JSON file")
 			if dbData, err = os.ReadFile(plainDbFile); err != nil {
 				log.Fatal("Cannot read the plain database file")
 				log.Fatal(err)
@@ -135,6 +140,7 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 			}
 
 			if !keyFileExists {
+				log.Info("The private key does not exists, generating a new key pair. It results in a new '" + undertowPath + "' file to be uploaded")
 				var privateKey *rsa.PrivateKey
 				if privateKey, err = generatePairKey(1024); err != nil {
 					log.Fatal("Cannot generate the key pair")
@@ -153,10 +159,13 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 					log.Fatal(err)
 					return
 				}
-				if err = os.WriteFile("undertow.tow", publicKeyBytes, 0644); err != nil {
+				if err = os.WriteFile(undertowPath, publicKeyBytes, 0644); err != nil {
 					log.Fatal("Cannot write the temporary undertow file")
 					log.Fatal(err)
 					return
+				}
+				if cryptedDbFileExists {
+					log.Warn("The new key pair is different from the one used to encrypt " + cryptedDbFile + ". arkHive will not delete the old " + cryptedDbFile + " automatically. Please delete it before starting again the executable.")
 				}
 			}
 

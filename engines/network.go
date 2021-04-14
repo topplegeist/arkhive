@@ -54,7 +54,7 @@ func NewNetworkEngine(databaseEngine *DatabaseEngine, undertowResource network.S
 	}
 
 	if _, err := os.Stat(common.SYSTEM_FOLDER_PATH); os.IsNotExist(err) {
-		os.Mkdir(common.SYSTEM_FOLDER_PATH, 0755)
+		os.Mkdir(common.SYSTEM_FOLDER_PATH, 0644)
 	}
 
 	go instance.importUserCryptoData()

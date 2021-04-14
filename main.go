@@ -1,9 +1,12 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"runtime/debug"
 	"time"
 
+	"arkhive.dev/launcher/common"
 	"arkhive.dev/launcher/engines"
 	"arkhive.dev/launcher/models/network"
 	log "github.com/sirupsen/logrus"
@@ -27,6 +30,13 @@ func main() {
 		panic("Failed to read build information")
 	}
 	log.Debug("Launching arkHive v.", bi.Main.Version)
+	if common.Debugging {
+		debuggingPath := filepath.Join("..", "..", "build", "go")
+		if _, err := os.Stat(debuggingPath); os.IsNotExist(err) {
+			os.Mkdir(debuggingPath, 0644)
+		}
+		os.Chdir(debuggingPath)
+	}
 
 	databaseEngine, _ := engines.NewDatabaseEngine()
 	networkEngine, _ := engines.NewNetworkEngine(databaseEngine, network.GetUndertow())

@@ -8,7 +8,6 @@ import (
 
 	"arkhive.dev/launcher/common"
 	"arkhive.dev/launcher/engines"
-	"arkhive.dev/launcher/models/network"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,7 +38,8 @@ func main() {
 	}
 
 	databaseEngine, _ := engines.NewDatabaseEngine()
-	networkEngine, _ := engines.NewNetworkEngine(databaseEngine, network.GetUndertow())
+	networkEngine, _ := engines.NewNetworkEngine(databaseEngine, engines.GetUndertow())
+	engines.NewSystemEngine(databaseEngine, networkEngine)
 
 	databaseEngine.InitializationEndEventEmitter.Subscribe(stopMain)
 	networkEngine.NetworkProcessInitializedEventEmitter.Subscribe(stopMain2)

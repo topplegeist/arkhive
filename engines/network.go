@@ -2,11 +2,11 @@ package engines
 
 import (
 	"bytes"
-	"context"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,7 +16,6 @@ import (
 	"arkhive.dev/launcher/common"
 	"arkhive.dev/launcher/models/network"
 	log "github.com/sirupsen/logrus"
-	"storj.io/uplink"
 )
 
 type CertificateStatus int
@@ -225,6 +224,32 @@ func (networkEngine NetworkEngine) verifyAccountCertificateSign() (err error) {
 	return
 }
 
+func (networkEngine *NetworkEngine) addResource(url *url.URL, path string, allowedFiles ...string) (resource *network.Resource, err error) {
+	var resourceHandler network.ResourceHandler
+	switch url.Scheme {
+	case "http":
+		resourceHandler = &network.HTTPResource{
+			URL: *url,
+		}
+	case "https":
+		resourceHandler = &network.HTTPResource{
+			URL: *url,
+		}
+	case "file":
+		err = errors.New("url schema not allowed")
+	case "torrent":
+		err = errors.New("url schema not allowed")
+	case "magnet":
+		err = errors.New("url schema not allowed")
+	}
+	if err == nil {
+		resource = network.NewResource(resourceHandler, path, allowedFiles)
+		// ToDo: connections
+		go resource.Download()
+	}
+	return
+}
+
 func (networkEngine *NetworkEngine) addUndertow(storjResource *network.StorjResource, isMain bool) error {
 	systemPath := common.SYSTEM_FOLDER_PATH
 	resource := network.NewResource(storjResource, systemPath, []string{})
@@ -256,41 +281,7 @@ func (networkEngine *NetworkEngine) addUndertow(storjResource *network.StorjReso
 		networkEngine.UserStatusChangedEventEmitter.Emit(true)
 		networkEngine.verifyAccountCertificateSign()
 	})
-	go func() {
-		userAccess, err := uplink.ParseAccess(storjResource.Access)
-		if err != nil {
-			resource.SetStatus(network.ERROR)
-			log.Error(err)
-			return
-		}
-		project, err := uplink.OpenProject(context.Background(), userAccess)
-		if err != nil {
-			resource.SetStatus(network.ERROR)
-			log.Error(err)
-			return
-		}
-		resource.SetStatus(network.DOWNLOADING)
-		stat, err := project.StatObject(context.Background(),
-			resource.Handler.GetURL().Host,
-			resource.Handler.GetURL().Path)
-		if err != nil {
-			resource.SetStatus(network.ERROR)
-			log.Error(err)
-			return
-		}
-		resource.Total = stat.System.ContentLength
-		download, err := project.DownloadObject(context.Background(),
-			resource.Handler.GetURL().Host,
-			resource.Handler.GetURL().Path, nil)
-		if err != nil {
-			resource.SetStatus(network.ERROR)
-			log.Error(err)
-			return
-		}
-		defer download.Close()
-		resource.Download(download)
-		resource.SetStatus(network.DOWNLOADED)
-	}()
+	go resource.Download()
 
 	return nil
 }

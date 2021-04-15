@@ -14,7 +14,6 @@ type GameConfig struct {
 }
 
 func GameConfigFromJSON(game *Game, name string, jsonValue interface{}) (instance *GameConfig, err error) {
-	// ToDo: Fix if any other types could be available
 	var (
 		value         string
 		integerValue  int64

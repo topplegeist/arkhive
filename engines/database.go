@@ -19,6 +19,16 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+type Locale int
+
+const (
+	ENGLISH Locale = iota
+	FRENCH
+	SPANISH
+	GERMAN
+	ITALIAN
+)
+
 type DatabaseEngine struct {
 	database *gorm.DB
 
@@ -240,6 +250,7 @@ func (databaseEngine DatabaseEngine) applyMigrations() (err error) {
 	return
 }
 
+// User variable
 func (databaseEngine DatabaseEngine) getStoredDBHash() string {
 	var userVariable models.UserVariable
 	if result := databaseEngine.database.First(&userVariable, "name = ?", "dbHash"); result.Error != nil || !userVariable.Value.Valid {
@@ -259,6 +270,36 @@ func (databaseEngine DatabaseEngine) setStoredDBHash(dbHash string) {
 	databaseEngine.database.Clauses(clause.OnConflict{
 		UpdateAll: true,
 	}).Create(&userVariable)
+}
+
+func (databaseEngine DatabaseEngine) GetLanguage() (Locale, error) {
+	var userVariable models.UserVariable
+	if result := databaseEngine.database.First(&userVariable, "name = ?", "language"); result.Error != nil || !userVariable.Value.Valid {
+		return ENGLISH, result.Error
+	}
+	language, err := strconv.Atoi(userVariable.Value.String)
+	if err == nil {
+		return ENGLISH, err
+	}
+	return Locale(language), nil
+}
+
+// Console
+func (databaseEngine *DatabaseEngine) GetConsoles() (models []models.Console, err error) {
+	if result := databaseEngine.database.Find(&models); result.Error != nil {
+		err = result.Error
+		return
+	}
+	return
+}
+
+// Tool
+func (databaseEngine *DatabaseEngine) GetTools() (models []models.Tool, err error) {
+	if result := databaseEngine.database.Find(&models); result.Error != nil {
+		err = result.Error
+		return
+	}
+	return
 }
 
 func (databaseEngine DatabaseEngine) storeDecryptedDB(database map[string]interface{}) (err error) {

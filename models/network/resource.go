@@ -26,6 +26,7 @@ const (
 
 type ResourceHandler interface {
 	GetURL() url.URL
+	Download(resource *Resource)
 }
 
 type Resource struct {
@@ -41,10 +42,10 @@ type Resource struct {
 	ProgressUpdatedEventEmitter *common.EventEmitter
 }
 
-func NewResource(storjResource ResourceHandler, systemPath string, allowedFiles []string) *Resource {
+func NewResource(resourceHandler ResourceHandler, resourcePath string, allowedFiles []string) *Resource {
 	return &Resource{
-		Handler:                     storjResource,
-		Path:                        systemPath,
+		Handler:                     resourceHandler,
+		Path:                        resourcePath,
 		AllowedFiles:                allowedFiles,
 		Status:                      PENDING,
 		AvailableEventEmitter:       new(common.EventEmitter),
@@ -72,14 +73,20 @@ func (resource *Resource) Write(buffer []byte) (int, error) {
 	return bufferSize, nil
 }
 
-func (resource *Resource) Download(reader io.Reader) {
+func (resource *Resource) Download() {
+	resource.Handler.Download(resource)
+}
+
+func (resource *Resource) Save(reader io.Reader) error {
 	out, err := os.Create(path.Join(resource.Path, filepath.Base(resource.Handler.GetURL().Path)))
 	if err != nil {
 		log.Error(err)
-		return
+		return err
 	}
+	defer out.Close()
 	if _, err := io.Copy(out, io.TeeReader(reader, resource)); err != nil {
 		log.Error(err)
-		return
+		return err
 	}
+	return nil
 }

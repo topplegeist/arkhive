@@ -11,17 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var stop = false
-var stop2 = false
-
-func stopMain(result bool) {
-	stop = result
-}
-
-func stopMain2(result bool) {
-	stop2 = result
-}
-
 func main() {
 	log.SetLevel(log.DebugLevel)
 	bi, ok := debug.ReadBuildInfo()
@@ -37,16 +26,33 @@ func main() {
 		os.Chdir(debuggingPath)
 	}
 
+	databaseEngineStop := false
+	networkEngineStop := false
+	systemEngineStop := false
+	searchEngineStop := false
+	storageEngineStop := false
+	launcherEngineStop := false
+
 	databaseEngine, _ := engines.NewDatabaseEngine()
 	networkEngine, _ := engines.NewNetworkEngine(databaseEngine, engines.GetUndertow())
-	engines.NewSystemEngine(databaseEngine, networkEngine)
-	engines.NewSearchEngine(databaseEngine)
-	engines.NewStorageEngine(databaseEngine, networkEngine)
-	engines.NewLauncherEngine(databaseEngine)
+	systemEngine, _ := engines.NewSystemEngine(databaseEngine, networkEngine)
+	searchEngine, _ := engines.NewSearchEngine(databaseEngine)
+	storageEngine, _ := engines.NewStorageEngine(databaseEngine, networkEngine)
+	launcherEngine, _ := engines.NewLauncherEngine(databaseEngine)
 
-	databaseEngine.InitializationEndEventEmitter.Subscribe(stopMain)
-	networkEngine.NetworkProcessInitializedEventEmitter.Subscribe(stopMain2)
-	for !stop || !stop2 {
+	databaseEngine.BootedEventEmitter.Subscribe(func(_ bool) { databaseEngineStop = true })
+	networkEngine.BootedEventEmitter.Subscribe(func(_ bool) { networkEngineStop = true })
+	systemEngine.BootedEventEmitter.Subscribe(func(_ bool) { systemEngineStop = true })
+	searchEngine.BootedEventEmitter.Subscribe(func(_ bool) { searchEngineStop = true })
+	storageEngine.BootedEventEmitter.Subscribe(func(_ bool) { storageEngineStop = true })
+	launcherEngine.BootedEventEmitter.Subscribe(func(_ bool) { launcherEngineStop = true })
+
+	for !databaseEngineStop ||
+		!networkEngineStop ||
+		!systemEngineStop ||
+		!searchEngineStop ||
+		!storageEngineStop ||
+		!launcherEngineStop {
 		time.Sleep(1 * time.Second)
 	}
 }

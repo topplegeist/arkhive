@@ -29,45 +29,34 @@ type ConsoleEntryDownload struct {
 }
 
 type SystemEngine struct {
-	settings              map[string]interface{}
-	databaseEngine        *DatabaseEngine
-	networkEngine         *NetworkEngine
-	preparingConsoleList  []ConsoleEntryDownload
-	preparingToolsList    []models.Tool
-	preparingPluginsList  []models.ConsolePlugin
-	downloadingCoresCount int
-	downloadingToolsCount int
-	remainingCoresCount   int
-	remainingToolsCount   int
-	extractingExtensions  []string
+	settings             map[string]interface{}
+	databaseEngine       *DatabaseEngine
+	networkEngine        *NetworkEngine
+	preparingConsoleList []ConsoleEntryDownload
+	preparingToolsList   []models.Tool
+	preparingPluginsList []models.ConsolePlugin
+	extractingExtensions []string
 
-	ToolsPreparedEventEmitter                *common.EventEmitter
-	DownloadingCoresCountChangedEventEmitter *common.EventEmitter
-	DownloadingToolsCountChangedEventEmitter *common.EventEmitter
-	ToolElaborationCompletedEventEmitter     *common.EventEmitter
-	DownloadingToolChangedEventEmitter       *common.EventEmitter
-	CoreElaborationCompletedEventEmitter     *common.EventEmitter
-	PluginElaborationCompletedEventEmitter   *common.EventEmitter
-	PluginsElaborationCompletedEventEmitter  *common.EventEmitter
-	CoresPreparedEventEmitter                *common.EventEmitter
-	DownloadingCoreChangedEventEmitter       *common.EventEmitter
+	// Event emitters
+	ToolsPreparedEventEmitter               *common.EventEmitter
+	ToolElaborationCompletedEventEmitter    *common.EventEmitter
+	CoreElaborationCompletedEventEmitter    *common.EventEmitter
+	PluginElaborationCompletedEventEmitter  *common.EventEmitter
+	PluginsElaborationCompletedEventEmitter *common.EventEmitter
+	BootedEventEmitter                      *common.EventEmitter
 }
 
 func NewSystemEngine(databaseEngine *DatabaseEngine, networkEngine *NetworkEngine) (instance *SystemEngine, err error) {
 	instance = &SystemEngine{
-		databaseEngine:                           databaseEngine,
-		networkEngine:                            networkEngine,
-		extractingExtensions:                     []string{"zip", "rar", "7z"},
-		ToolsPreparedEventEmitter:                &common.EventEmitter{},
-		DownloadingCoresCountChangedEventEmitter: &common.EventEmitter{},
-		DownloadingToolsCountChangedEventEmitter: &common.EventEmitter{},
-		ToolElaborationCompletedEventEmitter:     &common.EventEmitter{},
-		DownloadingToolChangedEventEmitter:       &common.EventEmitter{},
-		CoreElaborationCompletedEventEmitter:     &common.EventEmitter{},
-		PluginElaborationCompletedEventEmitter:   &common.EventEmitter{},
-		PluginsElaborationCompletedEventEmitter:  &common.EventEmitter{},
-		CoresPreparedEventEmitter:                &common.EventEmitter{},
-		DownloadingCoreChangedEventEmitter:       &common.EventEmitter{},
+		databaseEngine:                          databaseEngine,
+		networkEngine:                           networkEngine,
+		extractingExtensions:                    []string{"zip", "rar", "7z"},
+		ToolsPreparedEventEmitter:               &common.EventEmitter{},
+		ToolElaborationCompletedEventEmitter:    &common.EventEmitter{},
+		CoreElaborationCompletedEventEmitter:    &common.EventEmitter{},
+		PluginElaborationCompletedEventEmitter:  &common.EventEmitter{},
+		PluginsElaborationCompletedEventEmitter: &common.EventEmitter{},
+		BootedEventEmitter:                      &common.EventEmitter{},
 	}
 	databaseEngine.DecryptedEventEmitter.Subscribe(instance.startEngine)
 	return
@@ -162,8 +151,6 @@ func (systemEngine *SystemEngine) prepareTools() (err error) {
 				systemEngine.preparingToolsList, toolEntry)
 		}
 	}
-	systemEngine.downloadingToolsCount = len(systemEngine.preparingToolsList)
-	systemEngine.DownloadingToolsCountChangedEventEmitter.Emit(true)
 	systemEngine.ToolElaborationCompletedEventEmitter.Subscribe(systemEngine.prepareNextTool)
 	systemEngine.prepareNextTool(true)
 	return
@@ -217,8 +204,6 @@ func (systemEngine *SystemEngine) collectRetroArchCoresInfoFinished(reader io.Re
 		}
 	}
 
-	systemEngine.downloadingCoresCount = len(systemEngine.preparingConsoleList)
-	systemEngine.DownloadingCoresCountChangedEventEmitter.Emit(true)
 	systemEngine.CoreElaborationCompletedEventEmitter.Subscribe(func(_ bool) {
 		systemEngine.getPlugins(systemEngine.preparingConsoleList[0].ConsoleEntry)
 	})
@@ -232,14 +217,13 @@ func (systemEngine *SystemEngine) prepareNextCore(first bool) {
 		if !first {
 			systemEngine.preparingConsoleList = systemEngine.preparingConsoleList[1:]
 		}
-		systemEngine.remainingCoresCount = len(systemEngine.preparingConsoleList)
-		systemEngine.DownloadingCoreChangedEventEmitter.Emit(true)
-		if systemEngine.remainingCoresCount > 0 {
+		if len(systemEngine.preparingConsoleList) > 0 {
 			systemEngine.getCore(&systemEngine.preparingConsoleList[0])
 			return
 		}
+	} else {
+		systemEngine.BootedEventEmitter.Emit(true)
 	}
-	systemEngine.CoresPreparedEventEmitter.Emit(true)
 }
 
 func (systemEngine *SystemEngine) prepareNextPlugin(first bool) {
@@ -354,9 +338,7 @@ func (systemEngine *SystemEngine) prepareNextTool(first bool) {
 		if !first {
 			systemEngine.preparingToolsList = systemEngine.preparingToolsList[1:]
 		}
-		systemEngine.remainingToolsCount = len(systemEngine.preparingToolsList)
-		systemEngine.DownloadingToolChangedEventEmitter.Emit(true)
-		if systemEngine.remainingToolsCount > 0 {
+		if len(systemEngine.preparingToolsList) > 0 {
 			systemEngine.getTool(&systemEngine.preparingToolsList[0])
 			return
 		}

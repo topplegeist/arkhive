@@ -35,7 +35,7 @@ type NetworkEngine struct {
 	certificateStatus CertificateStatus
 	undertowPublicKey *rsa.PublicKey
 
-	// Signals
+	// Event emitters
 	UserAccountAvailableEventEmitter      *common.EventEmitter
 	UserStatusChangedEventEmitter         *common.EventEmitter
 	BootedEventEmitter                    *common.EventEmitter

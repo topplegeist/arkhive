@@ -33,13 +33,13 @@ type DatabaseEngine struct {
 	database *gorm.DB
 
 	// Event emitters
-	InitializationEndEventEmitter *common.EventEmitter
-	DecryptedEventEmitter         *common.EventEmitter
+	BootedEventEmitter    *common.EventEmitter
+	DecryptedEventEmitter *common.EventEmitter
 }
 
 func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 	instance = new(DatabaseEngine)
-	instance.InitializationEndEventEmitter = new(common.EventEmitter)
+	instance.BootedEventEmitter = new(common.EventEmitter)
 	instance.DecryptedEventEmitter = new(common.EventEmitter)
 
 	go func() {
@@ -227,9 +227,9 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 			panic("no database to be imported")
 		}
 
-		instance.InitializationEndEventEmitter.Emit(true)
+		instance.DecryptedEventEmitter.Emit(true)
+		instance.BootedEventEmitter.Emit(true)
 	}()
-	instance.InitializationEndEventEmitter.Subscribe(instance.databaseDecryptFutureFinished)
 	return
 }
 
@@ -490,10 +490,4 @@ func (databaseEngine DatabaseEngine) storeDecryptedTools(toolsJson map[string]in
 		}
 	}
 	return
-}
-
-func (databaseEngine DatabaseEngine) databaseDecryptFutureFinished(hasBeenInitializated bool) {
-	if hasBeenInitializated {
-		databaseEngine.DecryptedEventEmitter.Emit(true)
-	}
 }

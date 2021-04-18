@@ -12,12 +12,18 @@ import (
 )
 
 func main() {
-	log.SetLevel(log.DebugLevel)
+	if common.Debugging {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.ErrorLevel)
+	}
+
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
 		panic("Failed to read build information")
 	}
 	log.Debug("Launching arkHive v.", bi.Main.Version)
+
 	if common.Debugging {
 		debuggingPath := filepath.Join("..", "..", "build", "go")
 		if _, err := os.Stat(debuggingPath); os.IsNotExist(err) {
@@ -34,17 +40,16 @@ func main() {
 	launcherEngineStop := false
 
 	databaseEngine, _ := engines.NewDatabaseEngine()
-	networkEngine, _ := engines.NewNetworkEngine(databaseEngine, engines.GetUndertow())
-	systemEngine, _ := engines.NewSystemEngine(databaseEngine, networkEngine)
-	searchEngine, _ := engines.NewSearchEngine(databaseEngine)
-	storageEngine, _ := engines.NewStorageEngine(databaseEngine, networkEngine)
-	launcherEngine, _ := engines.NewLauncherEngine(databaseEngine)
-
 	databaseEngine.BootedEventEmitter.Subscribe(func(_ bool) { databaseEngineStop = true })
+	networkEngine, _ := engines.NewNetworkEngine(databaseEngine, engines.GetUndertow())
 	networkEngine.BootedEventEmitter.Subscribe(func(_ bool) { networkEngineStop = true })
+	systemEngine, _ := engines.NewSystemEngine(databaseEngine, networkEngine)
 	systemEngine.BootedEventEmitter.Subscribe(func(_ bool) { systemEngineStop = true })
+	searchEngine, _ := engines.NewSearchEngine(databaseEngine)
 	searchEngine.BootedEventEmitter.Subscribe(func(_ bool) { searchEngineStop = true })
+	storageEngine, _ := engines.NewStorageEngine(databaseEngine, networkEngine)
 	storageEngine.BootedEventEmitter.Subscribe(func(_ bool) { storageEngineStop = true })
+	launcherEngine, _ := engines.NewLauncherEngine(databaseEngine)
 	launcherEngine.BootedEventEmitter.Subscribe(func(_ bool) { launcherEngineStop = true })
 
 	for !databaseEngineStop ||

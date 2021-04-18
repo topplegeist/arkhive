@@ -254,6 +254,13 @@ func (systemEngine *SystemEngine) getCore(consoleEntryDownload *ConsoleEntryDown
 		resource.AvailableEventEmitter.Subscribe(func(_ *network.Resource) {
 			systemEngine.saveCoreFile(consoleEntryDownload.ConsoleEntry)
 		})
+		resource.ProgressUpdatedEventEmitter.Subscribe(func(resource *network.Resource) {
+			url := resource.Handler.GetURL()
+			log.Debug(url.String(),
+				": Core download progress ",
+				resource.Available, "/", resource.Total,
+				" (", resource.Available*100/resource.Total, "%)")
+		})
 	} else {
 		systemEngine.CoreElaborationCompletedEventEmitter.Emit(true)
 	}
@@ -272,17 +279,17 @@ func (systemEngine *SystemEngine) getPlugins(consoleEntry *models.Console) {
 func (systemEngine *SystemEngine) getPlugin(consolePlugin *models.ConsolePlugin) {
 	if consolePlugin.Type == "bios" {
 		var (
-			err                error
-			consolePluginFiles []models.ConsolePluginsFile
+			err                 error
+			consolePluginsFiles []models.ConsolePluginsFile
 		)
-		if consolePluginFiles, err = systemEngine.databaseEngine.GetConsolePluginsFilesByConsolePlugin(consolePlugin); err != nil {
+		if consolePluginsFiles, err = systemEngine.databaseEngine.GetConsolePluginsFilesByConsolePlugin(consolePlugin); err != nil {
 			log.Error("Cannot get console plugins files from database")
 			log.Error(err)
 			return
 		}
-		if len(consolePluginFiles) > 0 {
+		for consolePluginsFileIndex, consolePluginsFile := range consolePluginsFiles {
 			var consolePluginFileUrl *url.URL
-			if consolePluginFileUrl, err = url.Parse(consolePluginFiles[0].Url); err != nil {
+			if consolePluginFileUrl, err = url.Parse(consolePluginsFile.Url); err != nil {
 				log.Error("Cannot parse tool URL")
 				log.Error(err)
 				return
@@ -291,15 +298,24 @@ func (systemEngine *SystemEngine) getPlugin(consolePlugin *models.ConsolePlugin)
 			if resource, err = systemEngine.networkEngine.addResource(
 				consolePluginFileUrl,
 				path.Dir(
-					GetDownloadCorePluginPath(consolePlugin, &consolePluginFiles[0]))); err != nil {
+					GetDownloadCorePluginPath(consolePlugin, &consolePluginsFile))); err != nil {
 				log.Error("Cannot add the download resource to the network engine")
 				log.Error(err)
 				return
 			}
+			currentConsolePluginFileIndex := consolePluginsFileIndex
 			resource.AvailableEventEmitter.Subscribe(func(_ *network.Resource) {
-				systemEngine.savePluginFile(consolePlugin)
+				systemEngine.savePluginFile(consolePlugin, &consolePluginsFiles[currentConsolePluginFileIndex], currentConsolePluginFileIndex)
 			})
-		} else {
+			resource.ProgressUpdatedEventEmitter.Subscribe(func(resource *network.Resource) {
+				url := resource.Handler.GetURL()
+				log.Debug(url.String(),
+					": Console plugin file download progress ",
+					resource.Available, "/", resource.Total,
+					" (", resource.Available*100/resource.Total, "%)")
+			})
+		}
+		if len(consolePluginsFiles) == 0 {
 			var console models.Console
 			if console, err = systemEngine.databaseEngine.GetConsoleByConsolePlugin(consolePlugin); err != nil {
 				return
@@ -331,6 +347,13 @@ func (systemEngine *SystemEngine) getTool(toolEntry *models.Tool) {
 	resource.AvailableEventEmitter.Subscribe(func(_ *network.Resource) {
 		systemEngine.saveToolFile(toolEntry)
 	})
+	resource.ProgressUpdatedEventEmitter.Subscribe(func(resource *network.Resource) {
+		url := resource.Handler.GetURL()
+		log.Debug(url.String(),
+			": Tool download progress ",
+			resource.Available, "/", resource.Total,
+			" (", resource.Available*100/resource.Total, "%)")
+	})
 }
 
 func (systemEngine *SystemEngine) prepareNextTool(first bool) {
@@ -358,7 +381,7 @@ func (systemEngine *SystemEngine) saveCoreFile(consoleEntry *models.Console) {
 	systemEngine.CoreElaborationCompletedEventEmitter.Emit(true)
 }
 
-func (systemEngine *SystemEngine) savePluginFile(consolePlugin *models.ConsolePlugin) {
+func (systemEngine *SystemEngine) savePluginFile(consolePlugin *models.ConsolePlugin, consolePluginsFile *models.ConsolePluginsFile, consolePluginsFileIndex int) {
 	var (
 		err     error
 		console models.Console
@@ -366,18 +389,14 @@ func (systemEngine *SystemEngine) savePluginFile(consolePlugin *models.ConsolePl
 	if console, err = systemEngine.databaseEngine.GetConsoleByConsolePlugin(consolePlugin); err != nil {
 		return
 	}
-	log.Info("Console plugins for ", console.Slug, " downloaded")
-	var consolePluginFiles []models.ConsolePluginsFile
-	if consolePluginFiles, err = systemEngine.databaseEngine.GetConsolePluginsFilesByConsolePlugin(consolePlugin); err != nil {
+	log.Info("Console plugin file for ", console.Slug, " downloaded")
+	if err = systemEngine.extractPluginArchive(consolePlugin, consolePluginsFile, consolePluginsFileIndex); err != nil {
 		return
 	}
-	if err = systemEngine.extractPluginArchive(consolePlugin, consolePluginFiles); err != nil {
+	if err = systemEngine.elaboratePluginArchive(consolePlugin, consolePluginsFile, consolePluginsFileIndex); err != nil {
 		return
 	}
-	if err = systemEngine.elaboratePluginArchive(consolePlugin, consolePluginFiles); err != nil {
-		return
-	}
-	log.Info("Console plugins for ", console.Slug, " completed")
+	log.Info("Console plugin file for ", console.Slug, " completed")
 	systemEngine.PluginElaborationCompletedEventEmitter.Emit(false)
 }
 
@@ -460,75 +479,73 @@ func (systemEngine *SystemEngine) elaborateCoreArchive(consoleEntry *models.Cons
 	return
 }
 
-func (systemEngine *SystemEngine) extractPluginArchive(consolePlugin *models.ConsolePlugin, consolePluginsFiles []models.ConsolePluginsFile) error {
+func (systemEngine *SystemEngine) extractPluginArchive(consolePlugin *models.ConsolePlugin, consolePluginsFiles *models.ConsolePluginsFile, consolePluginsFileIndex int) error {
 	if consolePlugin.Type == "bios" {
-		for fileIndex, consolePluginFile := range consolePluginsFiles {
-			consolePluginFilePath := GetDownloadCorePluginPath(consolePlugin, &consolePluginFile)
-			isExtractingExtension := false
-			for _, item := range systemEngine.extractingExtensions {
-				if item == path.Ext(consolePluginFilePath)[1:] {
-					isExtractingExtension = true
-					break
-				}
+		consolePluginFilePath := GetDownloadCorePluginPath(consolePlugin, consolePluginsFiles)
+		isExtractingExtension := false
+		for _, item := range systemEngine.extractingExtensions {
+			if item == path.Ext(consolePluginFilePath)[1:] {
+				isExtractingExtension = true
+				break
 			}
-			if !isExtractingExtension {
-				return nil
-			}
-			process := exec.Command(
-				common.SEVENZ_EXE_PATH,
-				"x",
-				GetDownloadCorePluginPath(consolePlugin, &consolePluginFile),
-				"-o"+GetCorePluginTempPath(consolePlugin, fileIndex))
-			if err := process.Run(); err != nil {
-				log.Error("Error starting the extraction process")
-				log.Error(err)
-				return err
-			}
+		}
+		if !isExtractingExtension {
+			return nil
+		}
+		process := exec.Command(
+			common.SEVENZ_EXE_PATH,
+			"x",
+			GetDownloadCorePluginPath(consolePlugin, consolePluginsFiles),
+			"-o"+GetCorePluginTempPath(consolePlugin, consolePluginsFileIndex))
+		if err := process.Run(); err != nil {
+			log.Error("Error starting the extraction process")
+			log.Error(err)
+			return err
 		}
 	}
 	return nil
 }
 
-func (systemEngine *SystemEngine) elaboratePluginArchive(consolePlugin *models.ConsolePlugin, consolePluginsFiles []models.ConsolePluginsFile) (err error) {
+func (systemEngine *SystemEngine) elaboratePluginArchive(consolePlugin *models.ConsolePlugin, consolePluginsFile *models.ConsolePluginsFile, consolePluginsFileIndex int) (err error) {
 	if consolePlugin.Type == "bios" {
-		for fileIndex, consolePluginFile := range consolePluginsFiles {
-			consolePluginFilePath := GetDownloadCorePluginPath(consolePlugin, &consolePluginFile)
-			destinationFolder := ""
-			if consolePluginFile.Destination.Valid {
-				destinationFolder = consolePluginFile.Destination.String
-			}
-			if _, err := os.Stat(destinationFolder); os.IsNotExist(err) {
-				os.Mkdir(destinationFolder, 0644)
-			}
-			isExtractingExtension := false
-			for _, item := range systemEngine.extractingExtensions {
-				if item == path.Ext(consolePluginFilePath)[1:] {
-					isExtractingExtension = true
-					break
-				}
-			}
-			if !isExtractingExtension {
-				destinationPath := path.Join(destinationFolder, path.Base(consolePluginFilePath))
-				os.Rename(consolePluginFilePath, destinationPath)
-			} else {
-				extractionDir := GetCorePluginTempPath(consolePlugin, fileIndex)
-				collectionPath := extractionDir
-				if consolePluginFile.CollectionPath.Valid {
-					collectionPath = path.Join(collectionPath, consolePluginFile.CollectionPath.String)
-				}
-				var collectionFileInfo fs.FileInfo
-				if collectionFileInfo, err = os.Stat(collectionPath); err != nil {
-					return
-				}
-				if collectionFileInfo.IsDir() {
-					os.Rename(collectionPath, destinationFolder)
-				} else {
-					destinationPath := path.Join(destinationFolder, path.Base(collectionPath))
-					os.Rename(collectionPath, destinationPath)
-				}
+		consolePluginFilePath := GetDownloadCorePluginPath(consolePlugin, consolePluginsFile)
+		destinationFolder := ""
+		if consolePluginsFile.Destination.Valid {
+			destinationFolder = consolePluginsFile.Destination.String
+		}
+		if _, err := os.Stat(destinationFolder); os.IsNotExist(err) {
+			os.MkdirAll(destinationFolder, 0644)
+		}
+		isExtractingExtension := false
+		for _, item := range systemEngine.extractingExtensions {
+			if item == path.Ext(consolePluginFilePath)[1:] {
+				isExtractingExtension = true
+				break
 			}
 		}
-		os.RemoveAll(GetPluginTempPath())
+		if !isExtractingExtension {
+			destinationPath := path.Join(destinationFolder, path.Base(consolePluginFilePath))
+			os.MkdirAll(destinationFolder, 0644)
+			os.Rename(consolePluginFilePath, destinationPath)
+		} else {
+			extractionDir := GetCorePluginTempPath(consolePlugin, consolePluginsFileIndex)
+			collectionPath := extractionDir
+			if consolePluginsFile.CollectionPath.Valid {
+				collectionPath = path.Join(collectionPath, consolePluginsFile.CollectionPath.String)
+			}
+			var collectionFileInfo fs.FileInfo
+			if collectionFileInfo, err = os.Stat(collectionPath); err != nil {
+				return
+			}
+			if collectionFileInfo.IsDir() {
+				os.Rename(collectionPath, destinationFolder)
+			} else {
+				destinationPath := path.Join(destinationFolder, path.Base(collectionPath))
+				os.Rename(collectionPath, destinationPath)
+			}
+			os.RemoveAll(collectionPath)
+			os.RemoveAll(extractionDir)
+		}
 	}
 	return
 }
@@ -630,9 +647,6 @@ func GetDownloadToolPath(toolEntry *models.Tool) (toolPath string) {
 
 func GetCoreTempPath(consoleEntry *models.Console) (tempDownloadDir string) {
 	tempDownloadDir = common.TEMP_DOWNLOAD_FOLDER_PATH
-	if _, err := os.Stat(tempDownloadDir); os.IsNotExist(err) {
-		os.Mkdir(tempDownloadDir, 0644)
-	}
 	tempDownloadDir = path.Join(tempDownloadDir, consoleEntry.Slug)
 	if _, err := os.Stat(tempDownloadDir); os.IsNotExist(err) {
 		os.Mkdir(tempDownloadDir, 0644)
@@ -655,12 +669,9 @@ func GetToolTempPath(toolEntry *models.Tool) (tempDownloadDir string) {
 
 func GetPluginTempPath() string {
 	tempDownloadDir := common.TEMP_DOWNLOAD_FOLDER_PATH
-	if _, err := os.Stat(tempDownloadDir); os.IsNotExist(err) {
-		os.Mkdir(tempDownloadDir, 0644)
-	}
 	tempDownloadDir = path.Join(tempDownloadDir, common.TEMP_PLUGIN_FOLDER_NAME)
 	if _, err := os.Stat(tempDownloadDir); os.IsNotExist(err) {
-		os.Mkdir(tempDownloadDir, 0644)
+		os.MkdirAll(tempDownloadDir, 0644)
 	}
 	return tempDownloadDir
 }

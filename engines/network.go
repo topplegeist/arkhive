@@ -263,7 +263,7 @@ func (networkEngine *NetworkEngine) addUndertow(storjResource *network.StorjReso
 		log.Debug(url.String(),
 			": Undertow download progress ",
 			resource.Available, "/", resource.Total,
-			" (", resource.Available/resource.Total*100, "%)")
+			" (", resource.Available*100/resource.Total, "%)")
 	})
 	resource.AvailableEventEmitter.Subscribe(func(resource *network.Resource) {
 		var (

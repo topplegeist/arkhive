@@ -11,6 +11,7 @@ type Console struct {
 	SingleFile           bool   `gorm:"not null"`
 	LanguageVariableName sql.NullString
 	IsEmbedded           bool `gorm:"not null"`
+	ConsolePlugins       []ConsolePlugin
 }
 
 func ConsoleFromJSON(consoleSlug string, json interface{}) (instance *Console, err error) {
@@ -28,6 +29,7 @@ func ConsoleFromJSON(consoleSlug string, json interface{}) (instance *Console, e
 		json.(map[string]interface{})["single_file"].(bool),
 		languageVariableName,
 		false,
+		[]ConsolePlugin{},
 	}
 	return
 }

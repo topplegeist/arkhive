@@ -236,7 +236,9 @@ func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
 func (databaseEngine *DatabaseEngine) connectToDatabase() bool {
 	const fileName string = "data.sqllite3"
 	var err error
-	databaseEngine.database, err = gorm.Open(sqlite.Open(fileName), &gorm.Config{})
+	databaseEngine.database, err = gorm.Open(sqlite.Open(fileName), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	return err == nil
 }
 
@@ -290,6 +292,23 @@ func (databaseEngine *DatabaseEngine) GetConsoles() (models []models.Console, er
 		err = result.Error
 		return
 	}
+	return
+}
+
+func (databaseEngine *DatabaseEngine) GetConsoleByConsolePlugin(consolePlugin *models.ConsolePlugin) (model models.Console, err error) {
+	err = databaseEngine.database.Model(consolePlugin).Association("Console").Find(&model)
+	return
+}
+
+// Console Plugin
+func (databaseEngine *DatabaseEngine) GetConsolePluginsByConsole(console *models.Console) (models []models.ConsolePlugin, err error) {
+	err = databaseEngine.database.Model(console).Association("ConsolePlugins").Find(&models)
+	return
+}
+
+// Console Plugin Files
+func (databaseEngine *DatabaseEngine) GetConsolePluginsFilesByConsolePlugin(consolePlugin *models.ConsolePlugin) (models []models.ConsolePluginsFile, err error) {
+	err = databaseEngine.database.Model(consolePlugin).Association("ConsolePluginsFiles").Find(&models)
 	return
 }
 

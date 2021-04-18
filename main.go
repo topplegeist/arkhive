@@ -40,6 +40,9 @@ func main() {
 	databaseEngine, _ := engines.NewDatabaseEngine()
 	networkEngine, _ := engines.NewNetworkEngine(databaseEngine, engines.GetUndertow())
 	engines.NewSystemEngine(databaseEngine, networkEngine)
+	engines.NewSearchEngine(databaseEngine)
+	engines.NewStorageEngine(databaseEngine, networkEngine)
+	engines.NewLauncherEngine(databaseEngine)
 
 	databaseEngine.InitializationEndEventEmitter.Subscribe(stopMain)
 	networkEngine.NetworkProcessInitializedEventEmitter.Subscribe(stopMain2)

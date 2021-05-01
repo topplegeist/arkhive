@@ -19,9 +19,11 @@ import (
 func main() {
 	if environment.Debugging {
 		log.SetLevel(log.DebugLevel)
+		log.SetReportCaller(true)
 	} else {
 		log.SetLevel(log.ErrorLevel)
 	}
+	log.SetFormatter(&log.TextFormatter{})
 
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {

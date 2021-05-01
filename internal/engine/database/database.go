@@ -3,13 +3,14 @@ package database
 import (
 	"bytes"
 	"crypto/rsa"
-	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"os"
 	"reflect"
 	"strconv"
 
+	"arkhive.dev/launcher/internal/engine/database/importer"
 	"arkhive.dev/launcher/internal/entity"
 	"arkhive.dev/launcher/internal/folder"
 	"arkhive.dev/launcher/pkg/encryption"
@@ -37,169 +38,135 @@ type DatabaseEngine struct {
 	DecryptedEventEmitter *eventemitter.EventEmitter
 }
 
-func NewDatabaseEngine() (instance *DatabaseEngine, err error) {
+func NewDatabaseEngine() (instance *DatabaseEngine) {
 	instance = new(DatabaseEngine)
 	instance.BootedEventEmitter = new(eventemitter.EventEmitter)
 	instance.DecryptedEventEmitter = new(eventemitter.EventEmitter)
+	return
+}
 
-	go func() {
-		log.Info("Connecting to database")
-		if ok := instance.connectToDatabase(); !ok {
-			panic("Cannot open database")
-			return
-		}
-		log.Info("Applying database migrations")
-		if err = instance.applyMigrations(); err != nil {
+func (databaseEngine *DatabaseEngine) Initialize() (err error) {
+	log.Info("Connecting to database")
+	if ok := databaseEngine.connectToDatabase(); !ok {
+		panic("Cannot open database")
+		return
+	}
+	log.Info("Applying database migrations")
+	if err = databaseEngine.applyMigrations(); err != nil {
+		panic(err)
+		return
+	}
+
+	var storedDBHash []byte
+	if storedDBHash, err = databaseEngine.getStoredDBHash(); err != nil {
+		log.Error("Cannot decode the stored database hash")
+		panic(err)
+		return
+	}
+	hashHasBeenStored := len(storedDBHash) > 0
+	if !hashHasBeenStored {
+		log.Info("Cannot get the stored database hash")
+	}
+
+	_, existenceFlag := os.Stat(folder.CryptedDatabasePath)
+	cryptedDbFileExists := !os.IsNotExist(existenceFlag)
+	_, existenceFlag = os.Stat(folder.PlainDatabasePath)
+	plainDbFileExists := !os.IsNotExist(existenceFlag)
+	_, existenceFlag = os.Stat(folder.DatabaseKeyPath)
+	keyFileExists := !os.IsNotExist(existenceFlag)
+
+	canDecrypt := cryptedDbFileExists && keyFileExists
+	var encryptedDBHash []byte
+
+	if canDecrypt {
+		log.Info("Loading database private key")
+		var privateKey *rsa.PrivateKey
+		if privateKey, err = databaseEngine.loadPrivateKey(); err != nil {
 			panic(err)
-			return
 		}
-
-		var storedDBHash []byte
-		if storedDBHash, err = instance.getStoredDBHash(); err != nil {
-			log.Fatal("Cannot decode the stored database hash")
+		var cryptedDatabaseReader io.Reader
+		if cryptedDatabaseReader, err = os.Open(folder.CryptedDatabasePath); err != nil {
+			log.Error("Cannot read the database key file")
 			panic(err)
-			return
 		}
-		hashHasBeenStored := len(storedDBHash) > 0
-		if !hashHasBeenStored {
-			log.Info("Cannot get the stored database hash")
+		var (
+			databaseData    []byte
+			encryptedDBHash []byte
+		)
+		if databaseData, encryptedDBHash, err = importer.ImportCryptedDatabase(cryptedDatabaseReader, privateKey, storedDBHash); err != nil {
+			panic(err)
 		}
 
-		_, existenceFlag := os.Stat(folder.CryptedDatabasePath)
-		cryptedDbFileExists := !os.IsNotExist(existenceFlag)
-		_, existenceFlag = os.Stat(folder.PlainDatabasePath)
-		plainDbFileExists := !os.IsNotExist(existenceFlag)
-		_, existenceFlag = os.Stat(folder.DatabaseKeyPath)
-		keyFileExists := !os.IsNotExist(existenceFlag)
-
-		canDecrypt := cryptedDbFileExists && keyFileExists
-		var encryptedDBHash []byte
-		var dbData []byte
-
-		if canDecrypt {
-			if hashHasBeenStored {
-				log.Info("Loading the encrypted database")
-				if encryptedDBHash, err = instance.loadEncryptedDatabaseHash(); err != nil {
-					panic(err)
-				}
-			}
-
-			if !hashHasBeenStored || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
-				if hashHasBeenStored {
-					log.Info("The encrypted database hash not matches the one stored into the local database. Updating the local database")
-				}
-				log.Info("Loading encrypted database file")
-				var encryptedDBData []byte
-				if encryptedDBData, err = os.ReadFile(folder.CryptedDatabasePath); err != nil {
-					log.Fatal("Cannot read the crypted database")
-					panic(err)
-				}
-				log.Info("Loading database private key")
-				var privateKey *rsa.PrivateKey
-				if privateKey, err = instance.loadPrivateKey(); err != nil {
-					panic(err)
-				}
-				log.Info("Decrypting encrypted database file")
-				if dbData, err = encryption.Decrypt(privateKey, encryptedDBData); err != nil {
-					log.Fatal("Cannot decode the encrypted database")
-					panic(err)
-				}
-
-				if !hashHasBeenStored {
-					log.Info("Calculating encrypted database file hash")
-					hashEncoder := sha1.New()
-					hashEncoder.Write(encryptedDBData)
-					encryptedDBHash = hashEncoder.Sum(nil)
-				}
-
-				log.Info("Storing the database")
-				if err = instance.storeDecryptedDatabase(dbData); err != nil {
-					panic(err)
-				}
-				storingDBHash := base64.URLEncoding.EncodeToString(encryptedDBHash)
-				instance.setStoredDBHash(storingDBHash)
-			} else {
-				log.Info("No database updates")
-			}
-		} else if plainDbFileExists {
-			log.Info("The encrypted database cannot be decrypted, proceeding with the plain JSON file")
-			if dbData, err = os.ReadFile(folder.PlainDatabasePath); err != nil {
-				log.Fatal("Cannot read the plain database file")
+		if databaseData != nil {
+			log.Info("Storing the database")
+			if err = databaseEngine.storeDecryptedDatabase(databaseData); err != nil {
 				panic(err)
 			}
-
-			if !keyFileExists {
-				log.Info("The private key does not exists, generating a new key pair. It results in a new '" +
-					folder.NewUndertowPath + "' file to be uploaded")
-				var privateKey *rsa.PrivateKey
-				if privateKey, err = encryption.GeneratePairKey(1024); err != nil {
-					log.Fatal("Cannot generate the key pair")
-					panic(err)
-				}
-				log.Info("Saving the private key file")
-				privateKeyBytes := encryption.ExportPrivateKey(privateKey)
-				if err = os.WriteFile(folder.DatabaseKeyPath, privateKeyBytes, 0644); err != nil {
-					log.Fatal("Cannot write the private key file")
-					panic(err)
-				}
-				var publicKeyBytes []byte
-				log.Info("Saving the public key as " + folder.NewUndertowPath)
-				if publicKeyBytes, err = encryption.ExportPublicKey(&privateKey.PublicKey); err != nil {
-					log.Fatal("Cannot export the new undertow public key")
-					panic(err)
-				}
-				if err = os.WriteFile(folder.NewUndertowPath, publicKeyBytes, 0644); err != nil {
-					log.Fatal("Cannot write the temporary undertow file")
-					panic(err)
-				}
-				if cryptedDbFileExists {
-					log.Warn("The new key pair is different from the pair used to encrypt " + folder.CryptedDatabasePath +
-						". arkHive will not delete the old " + folder.CryptedDatabasePath +
-						" automatically. Please delete it before starting again the executable.")
-				}
+			storingDBHash := base64.URLEncoding.EncodeToString(encryptedDBHash)
+			databaseEngine.setStoredDBHash(storingDBHash)
+		}
+	} else if plainDbFileExists {
+		log.Info("The encrypted database cannot be decrypted, proceeding with the plain JSON file")
+		var plainDatabaseFileReader *os.File
+		if plainDatabaseFileReader, err = os.Open(folder.PlainDatabasePath); err != nil {
+			log.Error("Cannot read the plain database file")
+			panic(err)
+		}
+		var (
+			databaseKeyReader io.Reader
+			databaseKeyWriter io.Writer
+			undertowWriter    io.Writer
+		)
+		if keyFileExists {
+			if databaseKeyReader, err = os.Open(folder.DatabaseKeyPath); err != nil {
+				log.Error("Cannot read the database key file")
+				panic(err)
 			}
-
-			var encryptedDBData []byte
-			if !cryptedDbFileExists {
-				var privateKeyBytes []byte
-				if privateKeyBytes, err = os.ReadFile(folder.DatabaseKeyPath); err != nil {
-					log.Fatal("Cannot read the private key file")
-					panic(err)
-				}
-				var privateKey *rsa.PrivateKey
-				if privateKey, err = encryption.ParsePrivateKey(privateKeyBytes); err != nil {
-					log.Fatal("Cannot import the private key")
-					panic(err)
-				}
-				if encryptedDBData, err = encryption.Encrypt(&privateKey.PublicKey, dbData); err != nil {
-					log.Fatal("Cannot encrypt the new encrypted database")
-					panic(err)
-				}
-				if os.WriteFile(folder.CryptedDatabasePath, encryptedDBData, 0644); err != nil {
-					log.Fatal("Cannot write the new encrypted database file")
-					panic(err)
-				}
-
-				hashEncoder := sha1.New()
-				hashEncoder.Write(encryptedDBData)
-				encryptedDBHash = hashEncoder.Sum(nil)
+		} else {
+			if databaseKeyWriter, err = os.Create(folder.DatabaseKeyPath); err != nil {
+				log.Error("Cannot create the database key file")
+				panic(err)
 			}
-
-			if !hashHasBeenStored || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
-				if err = instance.storeDecryptedDatabase(dbData); err != nil {
-					panic(err)
-				}
-				storingDBHash := base64.URLEncoding.EncodeToString(encryptedDBHash)
-				instance.setStoredDBHash(storingDBHash)
+			if undertowWriter, err = os.Create(folder.NewUndertowPath); err != nil {
+				log.Error("Cannot create the new undertow file")
+				panic(err)
 			}
-		} else if !hashHasBeenStored {
-			panic("No database to be imported")
+		}
+		var cryptedDatabaseWriter io.Writer
+		if cryptedDbFileExists {
+			os.Remove(folder.CryptedDatabasePath)
+		}
+		if cryptedDatabaseWriter, err = os.Create(folder.CryptedDatabasePath); err != nil {
+			log.Error("Cannot create the crypted database file")
+			panic(err)
 		}
 
-		instance.DecryptedEventEmitter.Emit(true)
-		instance.BootedEventEmitter.Emit(true)
-	}()
+		var databaseData []byte
+		if databaseData, encryptedDBHash, err = importer.ImportPlainDatabase(
+			plainDatabaseFileReader, databaseKeyReader, databaseKeyWriter, undertowWriter, cryptedDatabaseWriter, cryptedDbFileExists); err != nil {
+			panic(err)
+		}
+
+		if !hashHasBeenStored || !reflect.DeepEqual(storedDBHash, encryptedDBHash) {
+			if err = databaseEngine.storeDecryptedDatabase(databaseData); err != nil {
+				panic(err)
+			}
+			storingDBHash := base64.URLEncoding.EncodeToString(encryptedDBHash)
+			databaseEngine.setStoredDBHash(storingDBHash)
+		}
+	} else if !hashHasBeenStored {
+		panic("No database to be imported")
+	}
+
+	databaseEngine.DecryptedEventEmitter.Emit(true)
+	databaseEngine.BootedEventEmitter.Emit(true)
 	return
+}
+
+func (databaseEngine *DatabaseEngine) Deinitialize() {
+	if database, err := databaseEngine.database.DB(); err == nil {
+		database.Close()
+	}
 }
 
 func (databaseEngine *DatabaseEngine) connectToDatabase() bool {
@@ -220,26 +187,14 @@ func (databaseEngine DatabaseEngine) applyMigrations() (err error) {
 	return
 }
 
-func (databaseEngine *DatabaseEngine) loadEncryptedDatabaseHash() (encryptedDBHash []byte, err error) {
-	var encryptedDBData []byte
-	if encryptedDBData, err = os.ReadFile(folder.CryptedDatabasePath); err != nil {
-		log.Fatal("Cannot read the encrypted database file")
-		return
-	}
-	hashEncoder := sha1.New()
-	hashEncoder.Write(encryptedDBData)
-	encryptedDBHash = hashEncoder.Sum(nil)
-	return
-}
-
 func (databaseEngine *DatabaseEngine) loadPrivateKey() (privateKey *rsa.PrivateKey, err error) {
 	var privateKeyBytes []byte
 	if privateKeyBytes, err = os.ReadFile(folder.DatabaseKeyPath); err != nil {
-		log.Fatal("Cannot read the secret key file")
+		log.Error("Cannot read the secret key file")
 		return
 	}
 	if privateKey, err = encryption.ParsePrivateKey(privateKeyBytes); err != nil {
-		log.Fatal("Cannot import the private key")
+		log.Error("Cannot import the private key")
 		return
 	}
 	return
@@ -250,7 +205,7 @@ func (databaseEngine DatabaseEngine) storeDecryptedDatabase(dbData []byte) (err 
 	decoder.UseNumber()
 	var database map[string]interface{}
 	if err = decoder.Decode(&database); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return
 	}
 
@@ -396,7 +351,7 @@ func (databaseEngine DatabaseEngine) storeDecryptedGames(gamesJson map[string]in
 			gameDisks = append(gameDisks, gameDisk)
 		}
 		for _, gameDisk := range gameDisks {
-			log.Info("Storing " + game.Slug + " game disk " + string(gameDisk.DiskNumber))
+			log.Info("Storing " + game.Slug + " game disk " + strconv.Itoa(int(gameDisk.DiskNumber)))
 			databaseEngine.database.Create(gameDisk)
 		}
 

@@ -46,8 +46,9 @@ func main() {
 	storageEngineStop := false
 	launcherEngineStop := false
 
-	databaseEngine, _ := database.NewDatabaseEngine()
+	databaseEngine := database.NewDatabaseEngine()
 	databaseEngine.BootedEventEmitter.Subscribe(func(_ bool) { databaseEngineStop = true })
+	go databaseEngine.Initialize()
 	networkEngine, _ := network.NewNetworkEngine(databaseEngine, system.GetUndertow())
 	networkEngine.BootedEventEmitter.Subscribe(func(_ bool) { networkEngineStop = true })
 	systemEngine, _ := system.NewSystemEngine(databaseEngine, networkEngine)

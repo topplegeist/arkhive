@@ -84,13 +84,13 @@ func (networkEngine *NetworkEngine) importUserCryptoData() (err error) {
 	if privateKeyFileExists && certificateFileExists {
 		var privateKeyBytes []byte
 		if privateKeyBytes, err = os.ReadFile(privateKeyFilePath); err != nil {
-			log.Fatal(err)
+			log.Error(err)
 			return
 		}
 		var privateKey *rsa.PrivateKey
 		if privateKey, err = encryption.ParsePrivateKey(privateKeyBytes); err != nil {
-			log.Fatal("Cannot decode the private key file content")
-			log.Fatal(err)
+			log.Error("Cannot decode the private key file content")
+			log.Error(err)
 			return
 		}
 		networkEngine.account.PrivateKey = *privateKey
@@ -107,11 +107,11 @@ func (networkEngine *NetworkEngine) importUserCryptoData() (err error) {
 	if !networkEngine.isUserCertificateAvailable() {
 		var privateKey *rsa.PrivateKey
 		if privateKey, err = encryption.GeneratePairKey(1024); err != nil {
-			log.Fatal(err)
+			log.Error(err)
 			return
 		}
 		if err = os.WriteFile(privateKeyFilePath, encryption.ExportPrivateKey(privateKey), 0644); err != nil {
-			log.Fatal(err)
+			log.Error(err)
 			return
 		}
 		networkEngine.account.PrivateKey = *privateKey
@@ -137,14 +137,14 @@ func (networkEngine NetworkEngine) readAccountCertificate() (err error) {
 
 	var jsonCertificateData []byte
 	if jsonCertificateData, err = os.ReadFile(certificateFilePath); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return
 	}
 	decoder := json.NewDecoder(bytes.NewReader(jsonCertificateData))
 	decoder.UseNumber()
 	var jsonCertificateDocument map[string]interface{}
 	if err = decoder.Decode(&jsonCertificateDocument); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return
 	}
 	networkEngine.account.Username = jsonCertificateDocument["username"].(string)
@@ -182,20 +182,20 @@ func (networkEngine NetworkEngine) verifyAccountCertificateSign() (err error) {
 	}
 	var jsonCertificateData []byte
 	if jsonCertificateData, err = os.ReadFile(certificateFilePath); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return
 	}
 	decoder := json.NewDecoder(bytes.NewReader(jsonCertificateData))
 	decoder.UseNumber()
 	var jsonCertificateDocument map[string]interface{}
 	if err = decoder.Decode(&jsonCertificateDocument); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return
 	}
 
 	if signBase64, ok := jsonCertificateDocument["sign"].(string); ok {
 		if networkEngine.account.Sign, err = base64.URLEncoding.DecodeString(signBase64); err != nil {
-			log.Fatal(err)
+			log.Error(err)
 			return
 		}
 	}

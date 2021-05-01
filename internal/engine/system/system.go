@@ -164,7 +164,7 @@ func (systemEngine *SystemEngine) collectRetroArchCoresInfoFinished(reader io.Re
 	remoteInfo := make(map[string]interface{})
 	if err := decoder.Decode(&remoteInfo); err != nil {
 		log.Error("Buildbot JSON parsing error")
-		log.Fatal(err)
+		log.Error(err)
 		return
 	}
 

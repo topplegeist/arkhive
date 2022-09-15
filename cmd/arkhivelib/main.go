@@ -1,43 +1,51 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
+	"flag"
 	"runtime/debug"
 	"time"
 
+	"arkhive.dev/launcher/internal/configloader"
 	"arkhive.dev/launcher/internal/engine/database"
 	"arkhive.dev/launcher/internal/engine/launcher"
 	"arkhive.dev/launcher/internal/engine/network"
 	"arkhive.dev/launcher/internal/engine/search"
 	"arkhive.dev/launcher/internal/engine/storage"
 	"arkhive.dev/launcher/internal/engine/system"
-	"arkhive.dev/launcher/internal/environment"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
+// Name of the current application. Used to load the configuration.
+const APPLICATION_NAME = "arkhive"
+
 func main() {
-	if environment.Debugging {
-		log.SetLevel(log.DebugLevel)
-		log.SetReportCaller(true)
-	} else {
-		log.SetLevel(log.ErrorLevel)
+	// Parsing the command line argument to change settings file location
+	configurationFilePath := flag.String("config", "", "Configuration file path")
+	flag.Parse()
+	// Loading application configuration
+	configuration, err := configloader.LoadConfiguration(APPLICATION_NAME, *configurationFilePath)
+	if err != nil {
+		logrus.Errorf("%+v", err)
+		return
 	}
-	log.SetFormatter(&log.TextFormatter{})
+	level, err := logrus.ParseLevel(configuration.LogLevel)
+	if err != nil {
+		logrus.Errorf("%+v", err)
+		return
+	}
+
+	// Set log level
+	logrus.SetLevel(level)
+	if *configurationFilePath != "" {
+		logrus.Infof("Loaded config file %s", *configurationFilePath)
+	}
+	logrus.Infof("Setting log level to %s", level.String())
 
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
 		panic("Failed to read build information")
 	}
-	log.Debug("Launching arkHive v.", bi.Main.Version)
-
-	if environment.Debugging {
-		debuggingPath := filepath.Join("..", "..", "build", "go")
-		if _, err := os.Stat(debuggingPath); os.IsNotExist(err) {
-			os.Mkdir(debuggingPath, 0644)
-		}
-		os.Chdir(debuggingPath)
-	}
+	logrus.Debug("Launching arkHive v.", bi.Main.Version)
 
 	databaseEngineStop := false
 	networkEngineStop := false

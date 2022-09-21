@@ -1,12 +1,15 @@
+// Package that handles key pair and encryption/decryption methods
 package encryption
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"os"
 )
 
 func GeneratePairKey(bitSize int) (*rsa.PrivateKey, error) {
@@ -23,6 +26,22 @@ func ExportPrivateKey(privateKey *rsa.PrivateKey) []byte {
 		},
 	)
 	return privateKeyPEM
+}
+
+func ParsePrivateKeyFile(path string) (privateKey *rsa.PrivateKey, err error) {
+	var databaseKeyReader *os.File
+	if databaseKeyReader, err = os.Open(path); err != nil {
+		panic(err)
+	}
+	defer databaseKeyReader.Close()
+	privateKeyBuffer := &bytes.Buffer{}
+	if _, err = privateKeyBuffer.ReadFrom(databaseKeyReader); err != nil {
+		panic(err)
+	}
+	if privateKey, err = ParsePrivateKey(privateKeyBuffer.Bytes()); err != nil {
+		panic(err)
+	}
+	return
 }
 
 func ParsePrivateKey(privatePEM []byte) (*rsa.PrivateKey, error) {

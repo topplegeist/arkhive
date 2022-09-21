@@ -10,11 +10,13 @@ import (
 // Structure to bind application parameters
 type Config struct {
 	LogLevel string `mapstructure:"LOG_LEVEL"` // logrus library log level to be assigned
+	BasePath string `mapstructure:"BASE_PATH"` // logrus library log level to be assigned
 }
 
 // Initialize default parameters values
 func initDefaultConfiguration() {
 	viper.SetDefault("LOG_LEVEL", "debug")
+	viper.SetDefault("BASE_PATH", ".")
 }
 
 // Load configuration from env file

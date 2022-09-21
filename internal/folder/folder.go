@@ -7,7 +7,7 @@ const TEMP = "temp"
 const PLUGIN = "plugin"
 const ROMS = "games"
 
-const CryptedDatabasePath = "db.honey"
+const EncryptedDatabasePath = "db.honey"
 const DatabasePath = "data.sqllite3"
 const PlainDatabasePath = "db.json"
 const DatabaseKeyPath = "private_key.bee"

@@ -24,6 +24,7 @@ func TestInitializeUnreacheableDatabase(t *testing.T) {
 	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		FailOpen: true,
 	}, []importer.Importer{})
+	defer instance.Deinitialize()
 	waitGroup := sync.WaitGroup{}
 	instance.Initialize(&waitGroup)
 	waitGroup.Wait()
@@ -34,6 +35,7 @@ func TestInitializeNoImporters(t *testing.T) {
 	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		HashCalculated: true,
 	}, []importer.Importer{})
+	defer instance.Deinitialize()
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(1)
 	instance.Initialize(&waitGroup)
@@ -47,6 +49,7 @@ func TestInitializeImporterCannotImport(t *testing.T) {
 	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		HashCalculated: true,
 	}, []importer.Importer{&mockImporter})
+	defer instance.Deinitialize()
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(1)
 	instance.Initialize(&waitGroup)
@@ -67,6 +70,7 @@ func TestInitializeImporterReturningInvalidDatabase(t *testing.T) {
 	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		HashCalculated: true,
 	}, []importer.Importer{&mockImporter})
+	defer instance.Deinitialize()
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(1)
 	instance.Initialize(&waitGroup)
@@ -83,6 +87,7 @@ func TestInitializeImporterReturningEmptyDatabase(t *testing.T) {
 	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		HashCalculated: true,
 	}, []importer.Importer{&mockImporter})
+	defer instance.Deinitialize()
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(1)
 	instance.Initialize(&waitGroup)
@@ -118,6 +123,7 @@ func TestInitializeImporterReturningConsoleAndGameDatabase(t *testing.T) {
 		HashCalculated: true,
 	}
 	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mockDelegate, []importer.Importer{&mockImporter})
+	defer instance.Deinitialize()
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(1)
 	instance.Initialize(&waitGroup)
@@ -161,6 +167,7 @@ func TestInitializeImporterReturningToolDatabase(t *testing.T) {
 		HashCalculated: true,
 	}
 	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mockDelegate, []importer.Importer{&mockImporter})
+	defer instance.Deinitialize()
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(1)
 	instance.Initialize(&waitGroup)

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"strconv"
@@ -97,20 +98,10 @@ func (databaseEngine *Database) Deinitialize() {
 }
 
 func (databaseEngine *Database) connectToDatabase() bool {
-	var err error
-	err = databaseEngine.delegate.Open(databaseEngine.basePath)
-	return err == nil
+	return databaseEngine.delegate.Open(databaseEngine.basePath) == nil
 }
 
 func (databaseEngine Database) applyMigrations() (err error) {
-	if err = databaseEngine.database.AutoMigrate(&entity.User{},
-		&entity.Chat{}, &tool.Tool{}, &console.Console{}, &game.Game{},
-		&tool.ToolFilesType{}, &console.ConsoleFileType{}, &console.ConsoleLanguage{},
-		&console.ConsolePlugin{}, &console.ConsolePluginsFile{},
-		&console.ConsoleConfig{}, &game.GameDisk{}, &game.GameAdditionalFile{},
-		&game.GameConfig{}, &entity.UserVariable{}); err != nil {
-		return err
-	}
 	if err = databaseEngine.delegate.Migrate(); err != nil {
 		return err
 	}
@@ -154,7 +145,9 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 			return
 		}
 		logrus.Infof("Storing %s", consoleInstance.Slug)
-		databaseEngine.database.Create(consoleInstance)
+		if err = databaseEngine.delegate.Create(consoleInstance); err != nil {
+			return
+		}
 		consoleObject := consoleValue.(map[string]interface{})
 		consoleFileTypesObject, _ := consoleObject["file_types"].(map[string]interface{})
 		for actionKey, actionValue := range consoleFileTypesObject {
@@ -164,7 +157,9 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 					return
 				}
 				logrus.Infof("Storing %s %s file type", consoleInstance.Slug, consoleFileType.FileType)
-				databaseEngine.database.Create(consoleFileType)
+				if err = databaseEngine.delegate.Create(consoleFileType); err != nil {
+					return
+				}
 			}
 		}
 		for levelKey, levelValue := range consoleObject {
@@ -176,7 +171,9 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 						return
 					}
 					logrus.Infof("Storing %s %s configuration", consoleInstance.Slug, consoleConfig.Name)
-					databaseEngine.database.Create(consoleConfig)
+					if err = databaseEngine.delegate.Create(consoleConfig); err != nil {
+						return
+					}
 				}
 			}
 		}
@@ -193,7 +190,9 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 						return
 					}
 					logrus.Infof("Storing %s %s language", consoleInstance.Slug, consoleLanguage.Name)
-					databaseEngine.database.Create(consoleLanguage)
+					if err = databaseEngine.delegate.Create(consoleLanguage); err != nil {
+						return
+					}
 				}
 			}
 		}
@@ -202,7 +201,7 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 				var consolePlugin *console.ConsolePlugin
 				consolePlugin, err = console.ConsolePluginFromJSON(pluginKey, consoleInstance)
 				logrus.Infof("Storing %s %s plugin", consoleInstance.Slug, consolePlugin.Type)
-				if databaseEngine.database.Create(consolePlugin); err != nil {
+				if databaseEngine.delegate.Create(consolePlugin); err != nil {
 					return
 				}
 				consolePluginObject := pluginValue.(map[string]interface{})
@@ -231,7 +230,9 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 							return
 						}
 						logrus.Infof("Storing %s %s plugin %s file", consoleInstance.Slug, consolePlugin.Type, consolePluginsFile.Url)
-						databaseEngine.database.Create(consolePluginsFile)
+						if err = databaseEngine.delegate.Create(consolePluginsFile); err != nil {
+							return
+						}
 					}
 				}
 			}
@@ -244,8 +245,7 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 	for gameKey, gameValue := range gamesJson {
 		var consoleInstance console.Console
 		gameObject := gameValue.(map[string]interface{})
-		if result := databaseEngine.database.First(&consoleInstance, "slug = ?", gameObject["console_slug"].(string)); result.Error != nil {
-			err = result.Error
+		if err = databaseEngine.delegate.First(&consoleInstance, "slug = ?", gameObject["console_slug"].(string)); err != nil {
 			return
 		}
 		var gameInstance *game.Game
@@ -253,7 +253,9 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 			return
 		}
 		logrus.Infof("Storing %s game", gameInstance.Slug)
-		databaseEngine.database.Create(gameInstance)
+		if err = databaseEngine.delegate.Create(gameInstance); err != nil {
+			return
+		}
 
 		collectionPath := gameObject["collection_path"]
 		var gameDisks = []*game.GameDisk{}
@@ -275,7 +277,9 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 		}
 		for _, gameDisk := range gameDisks {
 			logrus.Infof("Storing %s game disk %d", gameInstance.Slug, gameDisk.DiskNumber)
-			databaseEngine.database.Create(gameDisk)
+			if err = databaseEngine.delegate.Create(gameDisk); err != nil {
+				return
+			}
 		}
 
 		if gameConfigObject, ok := gameObject["config"].(map[string]interface{}); ok {
@@ -285,7 +289,9 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 					return
 				}
 				logrus.Infof("Storing %s %s configuration", gameInstance.Slug, gameConfig.Name)
-				databaseEngine.database.Create(gameConfig)
+				if err = databaseEngine.delegate.Create(gameConfig); err != nil {
+					return
+				}
 			}
 		}
 		if gameAdditionlFilesObject, ok := gameObject["additional_files"].([]interface{}); ok {
@@ -295,7 +301,9 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 					return
 				}
 				logrus.Infof("Storing %s %s additional File", gameInstance.Slug, gameAdditionalFile.Name)
-				databaseEngine.database.Create(gameAdditionalFile)
+				if err = databaseEngine.delegate.Create(gameAdditionalFile); err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -309,7 +317,9 @@ func (databaseEngine Database) storeDecryptedTools(toolsJson map[string]interfac
 			return
 		}
 		logrus.Infof("Storing %s tool", toolInstance.Slug)
-		databaseEngine.database.Create(toolInstance)
+		if err = databaseEngine.delegate.Create(toolInstance); err != nil {
+			return
+		}
 
 		if toolFileTypesObject, ok := toolValue.(map[string]interface{})["file_types"].([]interface{}); ok {
 			for _, toolFileTypeObject := range toolFileTypesObject {
@@ -318,7 +328,9 @@ func (databaseEngine Database) storeDecryptedTools(toolsJson map[string]interfac
 					return
 				}
 				logrus.Infof("Storing %s %s tool file", toolInstance.Slug, toolFileType.Tool.Url)
-				databaseEngine.database.Create(toolFileType)
+				if err = databaseEngine.delegate.Create(toolFileType); err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -327,7 +339,7 @@ func (databaseEngine Database) storeDecryptedTools(toolsJson map[string]interfac
 
 func (databaseEngine Database) getStoredDBHash() (storedDBHash []byte, err error) {
 	var userVariable entity.UserVariable
-	if result := databaseEngine.database.First(&userVariable, "name = ?", "dbHash"); result.Error != nil || !userVariable.Value.Valid {
+	if err = databaseEngine.delegate.First(&userVariable, "name = ?", "dbHash"); err != nil || !userVariable.Value.Valid {
 		storedDBHash = []byte{}
 		return
 	}
@@ -335,7 +347,7 @@ func (databaseEngine Database) getStoredDBHash() (storedDBHash []byte, err error
 	return
 }
 
-func (databaseEngine Database) setStoredDBHash(dbHash string) {
+func (databaseEngine Database) setStoredDBHash(dbHash string) (err error) {
 	userVariable := entity.UserVariable{
 		Name: "dbHash",
 		Value: sql.NullString{
@@ -343,7 +355,8 @@ func (databaseEngine Database) setStoredDBHash(dbHash string) {
 			Valid:  true,
 		},
 	}
-	databaseEngine.database.Clauses(clause.OnConflict{
-		UpdateAll: true,
-	}).Create(&userVariable)
+	if err = databaseEngine.delegate.CreateOrUpdate(&userVariable); err != nil {
+		return
+	}
+	return
 }

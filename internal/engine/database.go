@@ -42,21 +42,21 @@ func NewDatabase(basePath string, delegate delegate.DatabaseDelegate, importers 
 	return
 }
 
-func (databaseEngine *Database) Initialize(waitGroup *sync.WaitGroup) {
+func (d *Database) Initialize(waitGroup *sync.WaitGroup) {
 	var err error
 	// Create or update the database if needed
 	logrus.Info("Connecting to database")
-	if ok := databaseEngine.connectToDatabase(); !ok {
+	if ok := d.connectToDatabase(); !ok {
 		panic("cannot open database")
 	}
 	logrus.Info("Applying database migrations")
-	if err = databaseEngine.applyMigrations(); err != nil {
+	if err = d.applyMigrations(); err != nil {
 		panic(err)
 	}
 
 	// Check whether the database hash has been already saved on the database
 	var storedDBHash []byte
-	if storedDBHash, err = databaseEngine.getStoredDBHash(); err != nil {
+	if storedDBHash, err = d.getStoredDBHash(); err != nil {
 		logrus.Error("Cannot decode the stored database hash")
 		panic(err)
 	}
@@ -70,8 +70,8 @@ func (databaseEngine *Database) Initialize(waitGroup *sync.WaitGroup) {
 		databaseData    []byte
 		encryptedDBHash []byte
 	)
-	for _, importer := range databaseEngine.importers {
-		if importer.CanImport() {
+	for _, importer := range d.importers {
+		if importer.CanImport() && importer.IsUpdated() {
 			if databaseData, encryptedDBHash, err = importer.Import(); err != nil {
 				panic("error importing the database")
 			}
@@ -82,33 +82,33 @@ func (databaseEngine *Database) Initialize(waitGroup *sync.WaitGroup) {
 	// Parse the database data read, if any
 	if databaseData != nil {
 		logrus.Info("Storing the database")
-		if err = databaseEngine.storeDecryptedDatabase(databaseData); err != nil {
+		if err = d.storeDecryptedDatabase(databaseData); err != nil {
 			panic(err)
 		}
 		storingDBHash := base64.URLEncoding.EncodeToString(encryptedDBHash)
-		databaseEngine.setStoredDBHash(storingDBHash)
+		d.setStoredDBHash(storingDBHash)
 	}
 
 	// End the routine
 	waitGroup.Done()
 }
 
-func (databaseEngine *Database) Deinitialize() {
-	databaseEngine.delegate.Close()
+func (d *Database) Deinitialize() {
+	d.delegate.Close()
 }
 
-func (databaseEngine *Database) connectToDatabase() bool {
-	return databaseEngine.delegate.Open(databaseEngine.basePath) == nil
+func (d *Database) connectToDatabase() bool {
+	return d.delegate.Open(d.basePath) == nil
 }
 
-func (databaseEngine Database) applyMigrations() (err error) {
-	if err = databaseEngine.delegate.Migrate(); err != nil {
+func (d Database) applyMigrations() (err error) {
+	if err = d.delegate.Migrate(); err != nil {
 		return err
 	}
 	return
 }
 
-func (databaseEngine Database) storeDecryptedDatabase(dbData []byte) (err error) {
+func (d Database) storeDecryptedDatabase(dbData []byte) (err error) {
 	decoder := json.NewDecoder(bytes.NewReader(dbData))
 	decoder.UseNumber()
 	var database map[string]interface{}
@@ -118,19 +118,19 @@ func (databaseEngine Database) storeDecryptedDatabase(dbData []byte) (err error)
 	}
 
 	if entities, ok := database["consoles"]; ok {
-		if err = databaseEngine.storeDecryptedConsoles(entities.(map[string]interface{})); err != nil {
+		if err = d.storeDecryptedConsoles(entities.(map[string]interface{})); err != nil {
 			logrus.Errorf("%+v", err)
 			return
 		}
 	}
 	if entities, ok := database["games"]; ok {
-		if err = databaseEngine.storeDecryptedGames(entities.(map[string]interface{})); err != nil {
+		if err = d.storeDecryptedGames(entities.(map[string]interface{})); err != nil {
 			logrus.Errorf("%+v", err)
 			return
 		}
 	}
 	if entities, ok := database["win_tools"]; ok {
-		if err = databaseEngine.storeDecryptedTools(entities.(map[string]interface{})); err != nil {
+		if err = d.storeDecryptedTools(entities.(map[string]interface{})); err != nil {
 			logrus.Errorf("%+v", err)
 			return
 		}
@@ -138,14 +138,16 @@ func (databaseEngine Database) storeDecryptedDatabase(dbData []byte) (err error)
 	return
 }
 
-func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]interface{}) (err error) {
+func (d Database) extract
+
+func (d Database) storeDecryptedConsoles(consolesJson map[string]interface{}) (err error) {
 	for consoleKey, consoleValue := range consolesJson {
 		var consoleInstance *console.Console
 		if consoleInstance, err = console.ConsoleFromJSON(consoleKey, consoleValue); err != nil {
 			return
 		}
 		logrus.Infof("Storing %s", consoleInstance.Slug)
-		if err = databaseEngine.delegate.Create(consoleInstance); err != nil {
+		if err = d.delegate.Create(consoleInstance); err != nil {
 			return
 		}
 		consoleObject := consoleValue.(map[string]interface{})
@@ -157,7 +159,7 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 					return
 				}
 				logrus.Infof("Storing %s %s file type", consoleInstance.Slug, consoleFileType.FileType)
-				if err = databaseEngine.delegate.Create(consoleFileType); err != nil {
+				if err = d.delegate.Create(consoleFileType); err != nil {
 					return
 				}
 			}
@@ -171,7 +173,7 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 						return
 					}
 					logrus.Infof("Storing %s %s configuration", consoleInstance.Slug, consoleConfig.Name)
-					if err = databaseEngine.delegate.Create(consoleConfig); err != nil {
+					if err = d.delegate.Create(consoleConfig); err != nil {
 						return
 					}
 				}
@@ -190,7 +192,7 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 						return
 					}
 					logrus.Infof("Storing %s %s language", consoleInstance.Slug, consoleLanguage.Name)
-					if err = databaseEngine.delegate.Create(consoleLanguage); err != nil {
+					if err = d.delegate.Create(consoleLanguage); err != nil {
 						return
 					}
 				}
@@ -201,7 +203,7 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 				var consolePlugin *console.ConsolePlugin
 				consolePlugin, err = console.ConsolePluginFromJSON(pluginKey, consoleInstance)
 				logrus.Infof("Storing %s %s plugin", consoleInstance.Slug, consolePlugin.Type)
-				if databaseEngine.delegate.Create(consolePlugin); err != nil {
+				if d.delegate.Create(consolePlugin); err != nil {
 					return
 				}
 				consolePluginObject := pluginValue.(map[string]interface{})
@@ -230,7 +232,7 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 							return
 						}
 						logrus.Infof("Storing %s %s plugin %s file", consoleInstance.Slug, consolePlugin.Type, consolePluginsFile.Url)
-						if err = databaseEngine.delegate.Create(consolePluginsFile); err != nil {
+						if err = d.delegate.Create(consolePluginsFile); err != nil {
 							return
 						}
 					}
@@ -241,11 +243,11 @@ func (databaseEngine Database) storeDecryptedConsoles(consolesJson map[string]in
 	return
 }
 
-func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interface{}) (err error) {
+func (d Database) storeDecryptedGames(gamesJson map[string]interface{}) (err error) {
 	for gameKey, gameValue := range gamesJson {
 		var consoleInstance console.Console
 		gameObject := gameValue.(map[string]interface{})
-		if err = databaseEngine.delegate.First(&consoleInstance, "slug = ?", gameObject["console_slug"].(string)); err != nil {
+		if err = d.delegate.First(&consoleInstance, "slug = ?", gameObject["console_slug"].(string)); err != nil {
 			return
 		}
 		var gameInstance *game.Game
@@ -253,7 +255,7 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 			return
 		}
 		logrus.Infof("Storing %s game", gameInstance.Slug)
-		if err = databaseEngine.delegate.Create(gameInstance); err != nil {
+		if err = d.delegate.Create(gameInstance); err != nil {
 			return
 		}
 
@@ -277,7 +279,7 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 		}
 		for _, gameDisk := range gameDisks {
 			logrus.Infof("Storing %s game disk %d", gameInstance.Slug, gameDisk.DiskNumber)
-			if err = databaseEngine.delegate.Create(gameDisk); err != nil {
+			if err = d.delegate.Create(gameDisk); err != nil {
 				return
 			}
 		}
@@ -289,7 +291,7 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 					return
 				}
 				logrus.Infof("Storing %s %s configuration", gameInstance.Slug, gameConfig.Name)
-				if err = databaseEngine.delegate.Create(gameConfig); err != nil {
+				if err = d.delegate.Create(gameConfig); err != nil {
 					return
 				}
 			}
@@ -301,7 +303,7 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 					return
 				}
 				logrus.Infof("Storing %s %s additional File", gameInstance.Slug, gameAdditionalFile.Name)
-				if err = databaseEngine.delegate.Create(gameAdditionalFile); err != nil {
+				if err = d.delegate.Create(gameAdditionalFile); err != nil {
 					return
 				}
 			}
@@ -310,14 +312,14 @@ func (databaseEngine Database) storeDecryptedGames(gamesJson map[string]interfac
 	return
 }
 
-func (databaseEngine Database) storeDecryptedTools(toolsJson map[string]interface{}) (err error) {
+func (d Database) storeDecryptedTools(toolsJson map[string]interface{}) (err error) {
 	for toolKey, toolValue := range toolsJson {
 		var toolInstance *tool.Tool
 		if toolInstance, err = tool.ToolFromJSON(toolKey, toolsJson[toolKey]); err != nil {
 			return
 		}
 		logrus.Infof("Storing %s tool", toolInstance.Slug)
-		if err = databaseEngine.delegate.Create(toolInstance); err != nil {
+		if err = d.delegate.Create(toolInstance); err != nil {
 			return
 		}
 
@@ -328,7 +330,7 @@ func (databaseEngine Database) storeDecryptedTools(toolsJson map[string]interfac
 					return
 				}
 				logrus.Infof("Storing %s %s tool file", toolInstance.Slug, toolFileType.Tool.Url)
-				if err = databaseEngine.delegate.Create(toolFileType); err != nil {
+				if err = d.delegate.Create(toolFileType); err != nil {
 					return
 				}
 			}
@@ -337,9 +339,9 @@ func (databaseEngine Database) storeDecryptedTools(toolsJson map[string]interfac
 	return
 }
 
-func (databaseEngine Database) getStoredDBHash() (storedDBHash []byte, err error) {
+func (d Database) getStoredDBHash() (storedDBHash []byte, err error) {
 	var userVariable entity.UserVariable
-	if err = databaseEngine.delegate.First(&userVariable, "name = ?", "dbHash"); err != nil || !userVariable.Value.Valid {
+	if err = d.delegate.First(&userVariable, "name = ?", "dbHash"); err != nil || !userVariable.Value.Valid {
 		storedDBHash = []byte{}
 		return
 	}
@@ -347,7 +349,7 @@ func (databaseEngine Database) getStoredDBHash() (storedDBHash []byte, err error
 	return
 }
 
-func (databaseEngine Database) setStoredDBHash(dbHash string) (err error) {
+func (d Database) setStoredDBHash(dbHash string) (err error) {
 	userVariable := entity.UserVariable{
 		Name: "dbHash",
 		Value: sql.NullString{
@@ -355,7 +357,7 @@ func (databaseEngine Database) setStoredDBHash(dbHash string) (err error) {
 			Valid:  true,
 		},
 	}
-	if err = databaseEngine.delegate.CreateOrUpdate(&userVariable); err != nil {
+	if err = d.delegate.CreateOrUpdate(&userVariable); err != nil {
 		return
 	}
 	return

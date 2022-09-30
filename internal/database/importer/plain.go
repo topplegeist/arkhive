@@ -15,6 +15,9 @@ import (
 
 type PlainImporter struct {
 	basePath string
+	Consoles []Console
+	Games    []Game
+	Tools    []Tool
 }
 
 func (p *PlainImporter) Import(currentDBHash []byte) (importedDBHash []byte, err error) {
@@ -42,7 +45,7 @@ func (p *PlainImporter) CanImport() bool {
 }
 
 func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encryptedDBHash []byte, err error) {
-	// Read the database file
+	// Read the database file to be imported
 	var plainDatabaseFileReader *os.File
 	if plainDatabaseFileReader, err = os.Open(filepath.Join(p.basePath, folder.PlainDatabasePath)); err != nil {
 		logrus.Error("Cannot read the plain database file")
@@ -55,10 +58,6 @@ func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encrypt
 		panic(err)
 	}
 	databaseData = databaseBuffer.Bytes()
-
-	// Check if exists a copy of the encrypted database
-	_, existenceFlag := os.Stat(filepath.Join(p.basePath, folder.EncryptedDatabasePath))
-	encryptedDbFileExists := !os.IsNotExist(existenceFlag)
 
 	// Import the key file
 	logrus.Info("Importing the database key file")
@@ -75,7 +74,10 @@ func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encrypt
 		logrus.Error("Cannot encrypt the new encrypted database")
 		panic(err)
 	}
-	if encryptedDbFileExists {
+
+	// Check if exists a copy of the encrypted database
+	_, existenceFlag := os.Stat(filepath.Join(p.basePath, folder.EncryptedDatabasePath))
+	if !os.IsNotExist(existenceFlag) {
 		os.Remove(filepath.Join(p.basePath, folder.EncryptedDatabasePath))
 	}
 	var encryptedDatabaseWriter *os.File
@@ -107,13 +109,13 @@ func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encrypt
 }
 
 func (p PlainImporter) GetConsoles() (consoles []Console) {
-	return
+	return p.Consoles
 }
 
 func (p PlainImporter) GetGames() (games []Game) {
-	return
+	return p.Games
 }
 
 func (p PlainImporter) GetTools() (tools []Tool) {
-	return
+	return p.Tools
 }

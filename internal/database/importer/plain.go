@@ -14,16 +14,23 @@ import (
 )
 
 type PlainImporter struct {
-	basePath      string
-	currentDBHash []byte
+	basePath string
 }
 
-func (plainImporter *PlainImporter) CanImport() bool {
+func (p *PlainImporter) Import(currentDBHash []byte) (importedDBHash []byte, err error) {
+	var databaseData []byte
+	if p.CanImport() {
+		databaseData, importedDBHash, err = p.load(currentDBHash)
+	}
+	return
+}
+
+func (p *PlainImporter) CanImport() bool {
 	// Check if a plain database file and the key file exists
 	logrus.Debug("Checking if a plain database could be imported")
-	_, existenceFlag := os.Stat(filepath.Join(plainImporter.basePath, folder.PlainDatabasePath))
+	_, existenceFlag := os.Stat(filepath.Join(p.basePath, folder.PlainDatabasePath))
 	canImport := !os.IsNotExist(existenceFlag)
-	_, existenceFlag = os.Stat(filepath.Join(plainImporter.basePath, folder.DatabaseKeyPath))
+	_, existenceFlag = os.Stat(filepath.Join(p.basePath, folder.DatabaseKeyPath))
 	keyFileExists := !os.IsNotExist(existenceFlag)
 	if !canImport {
 		logrus.Debug("The plain database is not present")
@@ -34,10 +41,10 @@ func (plainImporter *PlainImporter) CanImport() bool {
 	return canImport && keyFileExists
 }
 
-func (plainImporter *PlainImporter) Import() (databaseData []byte, encryptedDBHash []byte, err error) {
+func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encryptedDBHash []byte, err error) {
 	// Read the database file
 	var plainDatabaseFileReader *os.File
-	if plainDatabaseFileReader, err = os.Open(filepath.Join(plainImporter.basePath, folder.PlainDatabasePath)); err != nil {
+	if plainDatabaseFileReader, err = os.Open(filepath.Join(p.basePath, folder.PlainDatabasePath)); err != nil {
 		logrus.Error("Cannot read the plain database file")
 		panic(err)
 	}
@@ -50,13 +57,13 @@ func (plainImporter *PlainImporter) Import() (databaseData []byte, encryptedDBHa
 	databaseData = databaseBuffer.Bytes()
 
 	// Check if exists a copy of the encrypted database
-	_, existenceFlag := os.Stat(filepath.Join(plainImporter.basePath, folder.EncryptedDatabasePath))
+	_, existenceFlag := os.Stat(filepath.Join(p.basePath, folder.EncryptedDatabasePath))
 	encryptedDbFileExists := !os.IsNotExist(existenceFlag)
 
 	// Import the key file
 	logrus.Info("Importing the database key file")
 	var privateKey *rsa.PrivateKey
-	if privateKey, err = encryption.ParsePrivateKeyFile(filepath.Join(plainImporter.basePath, folder.DatabaseKeyPath)); err != nil {
+	if privateKey, err = encryption.ParsePrivateKeyFile(filepath.Join(p.basePath, folder.DatabaseKeyPath)); err != nil {
 		logrus.Error("Cannot parse the private key file")
 		panic(err)
 	}
@@ -69,10 +76,10 @@ func (plainImporter *PlainImporter) Import() (databaseData []byte, encryptedDBHa
 		panic(err)
 	}
 	if encryptedDbFileExists {
-		os.Remove(filepath.Join(plainImporter.basePath, folder.EncryptedDatabasePath))
+		os.Remove(filepath.Join(p.basePath, folder.EncryptedDatabasePath))
 	}
 	var encryptedDatabaseWriter *os.File
-	if encryptedDatabaseWriter, err = os.Create(filepath.Join(plainImporter.basePath, folder.EncryptedDatabasePath)); err != nil {
+	if encryptedDatabaseWriter, err = os.Create(filepath.Join(p.basePath, folder.EncryptedDatabasePath)); err != nil {
 		logrus.Error("Cannot create the encrypted database file")
 		panic(err)
 	}
@@ -89,12 +96,24 @@ func (plainImporter *PlainImporter) Import() (databaseData []byte, encryptedDBHa
 	encryptedDBHash = hashEncoder.Sum(nil)
 
 	// Return the database file if the database has never been imported and if the hash stored in the database is different from that taken from the current file
-	if len(plainImporter.currentDBHash) == 0 || !reflect.DeepEqual(plainImporter.currentDBHash, encryptedDBHash) {
+	if len(currentDBHash) == 0 || !reflect.DeepEqual(currentDBHash, encryptedDBHash) {
 		logrus.Info("The encrypted database hash does not match the one stored into the local database. Updating the local database")
 	} else {
 		logrus.Info("No database updates")
 		databaseData = nil
 	}
 
+	return
+}
+
+func (p PlainImporter) GetConsoles() (consoles []Console) {
+	return
+}
+
+func (p PlainImporter) GetGames() (games []Game) {
+	return
+}
+
+func (p PlainImporter) GetTools() (tools []Tool) {
 	return
 }

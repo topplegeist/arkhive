@@ -1,6 +1,8 @@
 package importer
 
 type Importer interface {
-	Import() (databaseData []byte, encryptedDBHash []byte, err error)
-	CanImport() bool
+	Import(currentDBHash []byte) (importedDBHash []byte, err error)
+	GetConsoles() (consoles []Console)
+	GetGames() (games []Game)
+	GetTools() (tools []Tool)
 }

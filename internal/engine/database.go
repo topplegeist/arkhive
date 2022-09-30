@@ -1,10 +1,8 @@
 package engine
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/base64"
-	"encoding/json"
 	"strconv"
 	"sync"
 
@@ -66,23 +64,29 @@ func (d *Database) Initialize(waitGroup *sync.WaitGroup) {
 	}
 
 	// Import the database from the higher priority importer to the lower
+	var encryptedDBHash []byte
 	var (
-		databaseData    []byte
-		encryptedDBHash []byte
+		importedConsoles []importer.Console
+		importedGames    []importer.Game
+		importedTools    []importer.Tool
 	)
 	for _, importer := range d.importers {
-		if importer.CanImport() && importer.IsUpdated() {
-			if databaseData, encryptedDBHash, err = importer.Import(); err != nil {
-				panic("error importing the database")
-			}
+		encryptedDBHash, err = importer.Import(storedDBHash)
+		if err != nil {
+			panic("error importing the database")
+		}
+		if encryptedDBHash != nil {
+			importedConsoles = importer.GetConsoles()
+			importedGames = importer.GetGames()
+			importedTools = importer.GetTools()
 			break
 		}
 	}
 
 	// Parse the database data read, if any
-	if databaseData != nil {
-		logrus.Info("Storing the database")
-		if err = d.storeDecryptedDatabase(databaseData); err != nil {
+	if encryptedDBHash != nil {
+		logrus.Info("Storing the new imported database")
+		if err = d.storeImportedDatabase(importedConsoles, importedGames, importedTools); err != nil {
 			panic(err)
 		}
 		storingDBHash := base64.URLEncoding.EncodeToString(encryptedDBHash)
@@ -108,8 +112,8 @@ func (d Database) applyMigrations() (err error) {
 	return
 }
 
-func (d Database) storeDecryptedDatabase(dbData []byte) (err error) {
-	decoder := json.NewDecoder(bytes.NewReader(dbData))
+func (d Database) storeImportedDatabase(consoles []importer.Console, games []importer.Game, tools []importer.Tool) (err error) {
+	/*decoder := json.NewDecoder(bytes.NewReader(dbData))
 	decoder.UseNumber()
 	var database map[string]interface{}
 	if err = decoder.Decode(&database); err != nil {
@@ -134,11 +138,9 @@ func (d Database) storeDecryptedDatabase(dbData []byte) (err error) {
 			logrus.Errorf("%+v", err)
 			return
 		}
-	}
+	}*/
 	return
 }
-
-func (d Database) extract
 
 func (d Database) storeDecryptedConsoles(consolesJson map[string]interface{}) (err error) {
 	for consoleKey, consoleValue := range consolesJson {

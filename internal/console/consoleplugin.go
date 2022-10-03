@@ -7,14 +7,3 @@ type ConsolePlugin struct {
 	Type                string `gorm:"not null"`
 	ConsolePluginsFiles []ConsolePluginsFile
 }
-
-func ConsolePluginFromJSON(typeString string, consoleEntry *Console) (instance *ConsolePlugin, err error) {
-	instance = &ConsolePlugin{
-		0,
-		"",
-		*consoleEntry,
-		typeString,
-		[]ConsolePluginsFile{},
-	}
-	return
-}

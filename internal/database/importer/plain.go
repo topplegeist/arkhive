@@ -2,46 +2,63 @@ package importer
 
 import (
 	"bytes"
-	"crypto/rsa"
 	"crypto/sha1"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 
 	"arkhive.dev/launcher/internal/folder"
-	"arkhive.dev/launcher/pkg/encryption"
 	"github.com/sirupsen/logrus"
 )
 
 type PlainImporter struct {
 	basePath string
-	Consoles []Console
-	Games    []Game
-	Tools    []Tool
+	consoles []Console
+	games    []Game
+	tools    []Tool
+}
+
+func NewPlainImporter(basePath string) *PlainImporter {
+	return &PlainImporter{
+		basePath: basePath,
+		consoles: []Console{},
+		games:    []Game{},
+		tools:    []Tool{},
+	}
 }
 
 func (p *PlainImporter) Import(currentDBHash []byte) (importedDBHash []byte, err error) {
-	var databaseData []byte
-	if p.CanImport() {
-		databaseData, importedDBHash, err = p.load(currentDBHash)
+	if !p.canLoad() {
+		logrus.Debug("The plain database is not present")
+		return nil, nil
 	}
+
+	var databaseData []byte
+	if databaseData, importedDBHash, err = p.load(currentDBHash); err != nil {
+		return
+	}
+
+	// Return the database file if the database has never been imported and if the hash stored in the database is different from that taken from the current file
+	if reflect.DeepEqual(currentDBHash, importedDBHash) {
+		logrus.Info("No database updates")
+		return nil, nil
+	}
+
+	logrus.Info("The encrypted database hash does not match the one stored into the local database. Updating the local database")
+	if err = p.decode(databaseData); err != nil {
+		return
+	}
+
 	return
 }
 
-func (p *PlainImporter) CanImport() bool {
+func (p *PlainImporter) canLoad() bool {
 	// Check if a plain database file and the key file exists
 	logrus.Debug("Checking if a plain database could be imported")
 	_, existenceFlag := os.Stat(filepath.Join(p.basePath, folder.PlainDatabasePath))
-	canImport := !os.IsNotExist(existenceFlag)
-	_, existenceFlag = os.Stat(filepath.Join(p.basePath, folder.DatabaseKeyPath))
-	keyFileExists := !os.IsNotExist(existenceFlag)
-	if !canImport {
-		logrus.Debug("The plain database is not present")
-	}
-	if !keyFileExists {
-		logrus.Debug("Cannot load the private key")
-	}
-	return canImport && keyFileExists
+	return !os.IsNotExist(existenceFlag)
 }
 
 func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encryptedDBHash []byte, err error) {
@@ -59,63 +76,86 @@ func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encrypt
 	}
 	databaseData = databaseBuffer.Bytes()
 
-	// Import the key file
-	logrus.Info("Importing the database key file")
-	var privateKey *rsa.PrivateKey
-	if privateKey, err = encryption.ParsePrivateKeyFile(filepath.Join(p.basePath, folder.DatabaseKeyPath)); err != nil {
-		logrus.Error("Cannot parse the private key file")
-		panic(err)
-	}
-
-	// Write the encrypted database file or override it if already exists
-	logrus.Info("Encrypting the database")
-	var encryptedDBBytes []byte
-	if encryptedDBBytes, err = encryption.Encrypt(&privateKey.PublicKey, databaseData); err != nil {
-		logrus.Error("Cannot encrypt the new encrypted database")
-		panic(err)
-	}
-
-	// Check if exists a copy of the encrypted database
-	_, existenceFlag := os.Stat(filepath.Join(p.basePath, folder.EncryptedDatabasePath))
-	if !os.IsNotExist(existenceFlag) {
-		os.Remove(filepath.Join(p.basePath, folder.EncryptedDatabasePath))
-	}
-	var encryptedDatabaseWriter *os.File
-	if encryptedDatabaseWriter, err = os.Create(filepath.Join(p.basePath, folder.EncryptedDatabasePath)); err != nil {
-		logrus.Error("Cannot create the encrypted database file")
-		panic(err)
-	}
-	defer encryptedDatabaseWriter.Close()
-	if _, err = encryptedDatabaseWriter.Write(encryptedDBBytes); err != nil {
-		logrus.Error("Cannot write the new encrypted database file")
-		panic(err)
-	}
-
 	logrus.Info("Calculating the database hash")
 	// Calculate the hash of the new encrypted database
 	hashEncoder := sha1.New()
-	hashEncoder.Write(encryptedDBBytes)
+	hashEncoder.Write(databaseData)
 	encryptedDBHash = hashEncoder.Sum(nil)
 
-	// Return the database file if the database has never been imported and if the hash stored in the database is different from that taken from the current file
-	if len(currentDBHash) == 0 || !reflect.DeepEqual(currentDBHash, encryptedDBHash) {
-		logrus.Info("The encrypted database hash does not match the one stored into the local database. Updating the local database")
+	return
+}
+
+func (p *PlainImporter) decode(databaseData []byte) (err error) {
+	decoder := json.NewDecoder(bytes.NewReader(databaseData))
+	decoder.UseNumber()
+	var database map[string]interface{}
+	if err = decoder.Decode(&database); err != nil {
+		logrus.Errorf("%+v", err)
+		return
+	}
+
+	if jsonEntities, ok := database["consoles"]; ok {
+		if jsonEntitiesMap, ok := jsonEntities.(map[string]interface{}); ok {
+			for _, entity := range jsonEntitiesMap {
+				var console Console
+				if console, err = PlainDatabaseToConsole(entity); err != nil {
+					return
+				}
+				p.consoles = append(p.consoles, console)
+			}
+		} else {
+			err = errors.New("Console field is not an array")
+			return
+		}
 	} else {
-		logrus.Info("No database updates")
-		databaseData = nil
+		logrus.Warn("No consoles parsed during the database import")
+	}
+
+	if jsonEntities, ok := database["games"]; ok {
+		if jsonEntitiesMap, ok := jsonEntities.(map[string]interface{}); ok {
+			for slug, entity := range jsonEntitiesMap {
+				var game Game
+				if game, err = PlainDatabaseToGame(slug, entity); err != nil {
+					return
+				}
+				p.games = append(p.games, game)
+			}
+		} else {
+			err = errors.New("Console field is not an array")
+			return
+		}
+	} else {
+		logrus.Warn("No consoles parsed during the database import")
+	}
+
+	if jsonEntities, ok := database["win_tools"]; ok {
+		if jsonEntitiesMap, ok := jsonEntities.(map[string]interface{}); ok {
+			for _, entity := range jsonEntitiesMap {
+				var tool Tool
+				if tool, err = PlainDatabaseToTool(entity); err != nil {
+					return
+				}
+				p.tools = append(p.tools, tool)
+			}
+		} else {
+			err = errors.New("Console field is not an array")
+			return
+		}
+	} else {
+		logrus.Warn("No consoles parsed during the database import")
 	}
 
 	return
 }
 
 func (p PlainImporter) GetConsoles() (consoles []Console) {
-	return p.Consoles
+	return p.consoles
 }
 
 func (p PlainImporter) GetGames() (games []Game) {
-	return p.Games
+	return p.games
 }
 
 func (p PlainImporter) GetTools() (tools []Tool) {
-	return p.Tools
+	return p.tools
 }

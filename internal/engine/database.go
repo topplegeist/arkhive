@@ -3,7 +3,6 @@ package engine
 import (
 	"database/sql"
 	"encoding/base64"
-	"strconv"
 	"sync"
 
 	"arkhive.dev/launcher/internal/console"
@@ -113,136 +112,30 @@ func (d Database) applyMigrations() (err error) {
 }
 
 func (d Database) storeImportedDatabase(consoles []importer.Console, games []importer.Game, tools []importer.Tool) (err error) {
-	/*decoder := json.NewDecoder(bytes.NewReader(dbData))
-	decoder.UseNumber()
-	var database map[string]interface{}
-	if err = decoder.Decode(&database); err != nil {
-		logrus.Errorf("%+v", err)
-		return
-	}
+	/*
 
-	if entities, ok := database["consoles"]; ok {
-		if err = d.storeDecryptedConsoles(entities.(map[string]interface{})); err != nil {
-			logrus.Errorf("%+v", err)
-			return
+		if entities, ok := database["consoles"]; ok {
+			if err = d.storeDecryptedConsoles(entities.(map[string]interface{})); err != nil {
+				logrus.Errorf("%+v", err)
+				return
+			}
 		}
-	}
-	if entities, ok := database["games"]; ok {
-		if err = d.storeDecryptedGames(entities.(map[string]interface{})); err != nil {
-			logrus.Errorf("%+v", err)
-			return
+		if entities, ok := database["games"]; ok {
+			if err = d.storeDecryptedGames(entities.(map[string]interface{})); err != nil {
+				logrus.Errorf("%+v", err)
+				return
+			}
 		}
-	}
-	if entities, ok := database["win_tools"]; ok {
-		if err = d.storeDecryptedTools(entities.(map[string]interface{})); err != nil {
-			logrus.Errorf("%+v", err)
-			return
-		}
-	}*/
+		if entities, ok := database["win_tools"]; ok {
+			if err = d.storeDecryptedTools(entities.(map[string]interface{})); err != nil {
+				logrus.Errorf("%+v", err)
+				return
+			}
+		}*/
 	return
 }
 
 func (d Database) storeDecryptedConsoles(consolesJson map[string]interface{}) (err error) {
-	for consoleKey, consoleValue := range consolesJson {
-		var consoleInstance *console.Console
-		if consoleInstance, err = console.ConsoleFromJSON(consoleKey, consoleValue); err != nil {
-			return
-		}
-		logrus.Infof("Storing %s", consoleInstance.Slug)
-		if err = d.delegate.Create(consoleInstance); err != nil {
-			return
-		}
-		consoleObject := consoleValue.(map[string]interface{})
-		consoleFileTypesObject, _ := consoleObject["file_types"].(map[string]interface{})
-		for actionKey, actionValue := range consoleFileTypesObject {
-			for _, fileType := range actionValue.([]interface{}) {
-				var consoleFileType *console.ConsoleFileType
-				if consoleFileType, err = console.ConsoleFileTypeFromJSON(actionKey, consoleInstance, fileType.(string)); err != nil {
-					return
-				}
-				logrus.Infof("Storing %s %s file type", consoleInstance.Slug, consoleFileType.FileType)
-				if err = d.delegate.Create(consoleFileType); err != nil {
-					return
-				}
-			}
-		}
-		for levelKey, levelValue := range consoleObject {
-			if console.ConsoleConfigIsLevel(levelKey) {
-				consoleLevelObject := levelValue.(map[string]interface{})
-				for consoleConfigName, consoleConfigValue := range consoleLevelObject {
-					var consoleConfig *console.ConsoleConfig
-					if consoleConfig, err = console.ConsoleConfigFromJSON(consoleInstance, levelKey, consoleConfigName, consoleConfigValue.(string)); err != nil {
-						return
-					}
-					logrus.Infof("Storing %s %s configuration", consoleInstance.Slug, consoleConfig.Name)
-					if err = d.delegate.Create(consoleConfig); err != nil {
-						return
-					}
-				}
-			}
-		}
-		if consoleLanguageObject, ok := consoleObject["language"].(map[string]interface{}); ok {
-			consoleLanguageMappingObject, _ := consoleLanguageObject["mapping"].(map[string]interface{})
-			for languageIDKey, languageIDValue := range consoleLanguageMappingObject {
-				for _, languageEntry := range languageIDValue.([]interface{}) {
-					var languageID uint64
-					if languageID, err = strconv.ParseUint(languageIDKey, 10, 32); err != nil {
-						return
-					}
-					var consoleLanguage *console.ConsoleLanguage
-					if consoleLanguage, err = console.ConsoleLanguageFromJSON(consoleInstance, uint(languageID), languageEntry.(string)); err != nil {
-						return
-					}
-					logrus.Infof("Storing %s %s language", consoleInstance.Slug, consoleLanguage.Name)
-					if err = d.delegate.Create(consoleLanguage); err != nil {
-						return
-					}
-				}
-			}
-		}
-		if consolePluginsObject, ok := consoleObject["plugins"].(map[string]interface{}); ok {
-			for pluginKey, pluginValue := range consolePluginsObject {
-				var consolePlugin *console.ConsolePlugin
-				consolePlugin, err = console.ConsolePluginFromJSON(pluginKey, consoleInstance)
-				logrus.Infof("Storing %s %s plugin", consoleInstance.Slug, consolePlugin.Type)
-				if d.delegate.Create(consolePlugin); err != nil {
-					return
-				}
-				consolePluginObject := pluginValue.(map[string]interface{})
-				if len(consolePluginObject) > 0 {
-					consolePluginCollectionPath := consolePluginObject["collection_path"]
-					consolePluginDestination := consolePluginObject["destination"]
-					consolePluginFilesArray := consolePluginObject["files"].([]interface{})
-					for fileIndex := 0; fileIndex < len(consolePluginFilesArray); fileIndex++ {
-						var consolePluginCollectionPathValue interface{}
-						if consolePluginCollectionPathObject, ok := consolePluginCollectionPath.([]interface{}); ok {
-							consolePluginCollectionPathValue = consolePluginCollectionPathObject[fileIndex]
-						} else {
-							consolePluginCollectionPathValue = consolePluginCollectionPath
-						}
-						var consolePluginDestinationValue interface{}
-						if consolePluginDestinationObject, ok := consolePluginDestination.([]interface{}); ok {
-							consolePluginDestinationValue = consolePluginDestinationObject[fileIndex]
-						} else {
-							consolePluginDestinationValue = consolePluginDestination
-						}
-						var consolePluginsFile *console.ConsolePluginsFile
-						if consolePluginsFile, err = console.ConsolePluginsFileFromJSON(
-							consolePlugin, consolePluginCollectionPathValue,
-							consolePluginDestinationValue,
-							consolePluginFilesArray[fileIndex].(string)); err != nil {
-							return
-						}
-						logrus.Infof("Storing %s %s plugin %s file", consoleInstance.Slug, consolePlugin.Type, consolePluginsFile.Url)
-						if err = d.delegate.Create(consolePluginsFile); err != nil {
-							return
-						}
-					}
-				}
-			}
-		}
-	}
-	return
 }
 
 func (d Database) storeDecryptedGames(gamesJson map[string]interface{}) (err error) {

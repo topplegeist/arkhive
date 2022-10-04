@@ -66,20 +66,22 @@ func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encrypt
 	var plainDatabaseFileReader *os.File
 	if plainDatabaseFileReader, err = os.Open(filepath.Join(p.basePath, folder.PlainDatabasePath)); err != nil {
 		logrus.Error("Cannot read the plain database file")
-		panic(err)
+		return
 	}
 	defer plainDatabaseFileReader.Close()
 	databaseBuffer := &bytes.Buffer{}
 	if _, err = databaseBuffer.ReadFrom(plainDatabaseFileReader); err != nil {
 		logrus.Error("Cannot read the plain database")
-		panic(err)
+		return
 	}
 	databaseData = databaseBuffer.Bytes()
 
 	logrus.Info("Calculating the database hash")
 	// Calculate the hash of the new encrypted database
 	hashEncoder := sha1.New()
-	hashEncoder.Write(databaseData)
+	if _, err = hashEncoder.Write(databaseData); err != nil {
+		return
+	}
 	encryptedDBHash = hashEncoder.Sum(nil)
 
 	return

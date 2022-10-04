@@ -1,13 +1,13 @@
-package engine_test
+package database_test
 
 import (
 	"errors"
 	"sync"
 	"testing"
 
+	"arkhive.dev/launcher/internal/database"
 	"arkhive.dev/launcher/internal/database/importer"
 	"arkhive.dev/launcher/internal/database/mock"
-	"arkhive.dev/launcher/internal/engine"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +19,7 @@ func TestInitializeUnreacheableDatabase(t *testing.T) {
 			assert.Equal(t, "cannot open database", r)
 		}
 	}()
-	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
+	instance := database.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		FailOpen: true,
 	}, []importer.Importer{})
 	defer instance.Deinitialize()
@@ -30,7 +30,7 @@ func TestInitializeUnreacheableDatabase(t *testing.T) {
 }
 
 func TestInitializeNoImporters(t *testing.T) {
-	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
+	instance := database.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		HashCalculated: true,
 	}, []importer.Importer{})
 	defer instance.Deinitialize()
@@ -44,7 +44,7 @@ func TestInitializeImporterCannotImport(t *testing.T) {
 	mockImporter := mock.MockImporter{
 		CanImport: false,
 	}
-	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
+	instance := database.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		HashCalculated: true,
 	}, []importer.Importer{&mockImporter})
 	defer instance.Deinitialize()
@@ -65,7 +65,7 @@ func TestInitializeImporterReturningInvalidDatabase(t *testing.T) {
 		assert.NotNil(t, r)
 		assert.True(t, mockImporter.ImportStarted)
 	}()
-	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
+	instance := database.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		HashCalculated: true,
 	}, []importer.Importer{&mockImporter})
 	defer instance.Deinitialize()
@@ -81,7 +81,7 @@ func TestInitializeImporterSuccessful(t *testing.T) {
 		CanImport:       true,
 		EncryptedDBHash: []byte("Fake hash"),
 	}
-	instance := engine.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
+	instance := database.NewDatabase(TEST_FOLDER_PATH, &mock.MockDelegate{
 		HashCalculated: true,
 	}, []importer.Importer{&mockImporter})
 	defer instance.Deinitialize()

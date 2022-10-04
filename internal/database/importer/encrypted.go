@@ -15,68 +15,106 @@ import (
 )
 
 type EncryptedImporter struct {
+	plainImporter PlainImporter
 	basePath      string
-	currentDBHash []byte
 }
 
-func (encryptedImporter *EncryptedImporter) CanImport() (canImport bool) {
-	// Check if both the encrypted database file and the user private key exists
-	logrus.Debug("Checking if an encrypted database could be imported")
-	_, existenceFlag := os.Stat(filepath.Join(encryptedImporter.basePath, folder.EncryptedDatabasePath))
-	encryptedDbFileExists := !os.IsNotExist(existenceFlag)
-	_, existenceFlag = os.Stat(filepath.Join(encryptedImporter.basePath, folder.DatabaseKeyPath))
-	keyFileExists := !os.IsNotExist(existenceFlag)
-	canImport = encryptedDbFileExists && keyFileExists
-	if !canImport {
-		logrus.Debugf("The encrypted database could be imported (database: %t, key: %t)", encryptedDbFileExists, keyFileExists)
+func NewEncryptedImporter(basePath string) *EncryptedImporter {
+	return &EncryptedImporter{
+		PlainImporter{
+			basePath: basePath,
+			consoles: []Console{},
+			games:    []Game{},
+			tools:    []Tool{},
+		},
+		basePath,
 	}
-	return
 }
 
-func (encryptedImporter *EncryptedImporter) Import() (databaseData []byte, encryptedDBHash []byte, err error) {
+func (e *EncryptedImporter) Import(currentDBHash []byte) (importedDBHash []byte, err error) {
+	if !e.canLoad() {
+		logrus.Debug("Cannot load the encrypted database")
+		return nil, nil
+	}
+
 	// Load the user private key used to encrypt the database
 	logrus.Info("Loading database private key")
 	var privateKeyBytes []byte
-	if privateKeyBytes, err = os.ReadFile(filepath.Join(encryptedImporter.basePath, folder.DatabaseKeyPath)); err != nil {
+	if privateKeyBytes, err = os.ReadFile(filepath.Join(e.basePath, folder.DatabaseKeyPath)); err != nil {
 		logrus.Error("Cannot read the secret key file")
-		panic(err)
+		return
 	}
 	var privateKey *rsa.PrivateKey
 	if privateKey, err = encryption.ParsePrivateKey(privateKeyBytes); err != nil {
 		logrus.Error("Cannot import the private key")
-		panic(err)
+		return
 	}
 
 	// Load the encrypted database file
 	var encryptedDatabaseReader io.Reader
-	if encryptedDatabaseReader, err = os.Open(filepath.Join(encryptedImporter.basePath, folder.EncryptedDatabasePath)); err != nil {
+	if encryptedDatabaseReader, err = os.Open(filepath.Join(e.basePath, folder.EncryptedDatabasePath)); err != nil {
 		logrus.Error("Cannot read the database key file")
-		panic(err)
+		return
 	}
 	logrus.Info("Loading the encrypted database")
 	encryptedDBData := &bytes.Buffer{}
 	if _, err = encryptedDBData.ReadFrom(encryptedDatabaseReader); err != nil {
 		logrus.Error("Cannot read the encrypted database file")
-		panic(err)
+		return
 	}
 
 	// Calculate the encrypted database file hash
 	hashEncoder := sha1.New()
-	hashEncoder.Write(encryptedDBData.Bytes())
-	encryptedDBHash = hashEncoder.Sum(nil)
+	if _, err = hashEncoder.Write(encryptedDBData.Bytes()); err != nil {
+		return
+	}
+	encryptedDBHash := hashEncoder.Sum(nil)
 
 	// Return the database file if the database has never been imported and if the hash stored in the database is different from that of the current file
-	if len(encryptedImporter.currentDBHash) == 0 || !reflect.DeepEqual(encryptedImporter.currentDBHash, encryptedDBHash) {
-		if len(encryptedImporter.currentDBHash) > 0 {
+	if !reflect.DeepEqual(currentDBHash, encryptedDBHash) {
+		if len(currentDBHash) > 0 {
 			logrus.Info("The encrypted database hash not matches the one stored into the local database. Updating the local database")
 		}
 		logrus.Info("Decrypting encrypted database file")
+		var databaseData []byte
 		if databaseData, err = encryption.Decrypt(privateKey, encryptedDBData.Bytes()); err != nil {
 			logrus.Error("Cannot decode the encrypted database")
-			panic(err)
+			return
 		}
+		var plainDatabaseFile *os.File
+		if plainDatabaseFile, err = os.OpenFile(filepath.Join(e.basePath, folder.PlainDatabasePath), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644); err != nil {
+			return
+		}
+		defer plainDatabaseFile.Close()
+		if _, err = plainDatabaseFile.Write(databaseData); err != nil {
+			return
+		}
+		if _, err = e.plainImporter.Import(currentDBHash); err != nil {
+			return
+		}
+		importedDBHash = encryptedDBHash
 	} else {
 		logrus.Info("No database updates")
 	}
 	return
+}
+
+func (e *EncryptedImporter) canLoad() bool {
+	// Check if both the encrypted database file and the user private key exists
+	logrus.Debug("Checking if an encrypted database could be imported")
+	_, existenceFlag := os.Stat(filepath.Join(e.basePath, folder.EncryptedDatabasePath))
+	encryptedDbFileExists := !os.IsNotExist(existenceFlag)
+	_, existenceFlag = os.Stat(filepath.Join(e.basePath, folder.DatabaseKeyPath))
+	keyFileExists := !os.IsNotExist(existenceFlag)
+	return encryptedDbFileExists && keyFileExists
+}
+
+func (e *EncryptedImporter) GetConsoles() []Console {
+	return e.plainImporter.GetConsoles()
+}
+func (e *EncryptedImporter) GetGames() []Game {
+	return e.plainImporter.GetGames()
+}
+func (e *EncryptedImporter) GetTools() []Tool {
+	return e.plainImporter.GetTools()
 }

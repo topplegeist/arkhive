@@ -5,11 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"arkhive.dev/launcher/internal/console"
-	"arkhive.dev/launcher/internal/entity"
+	"arkhive.dev/launcher/internal/database/importer"
 	"arkhive.dev/launcher/internal/folder"
-	"arkhive.dev/launcher/internal/game"
-	"arkhive.dev/launcher/internal/tool"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -32,12 +29,12 @@ func (sqliteDelegate *SQLiteDelegate) Open(basePath string) (err error) {
 }
 
 func (sqliteDelegate *SQLiteDelegate) Migrate() (err error) {
-	return sqliteDelegate.database.AutoMigrate(&entity.User{},
-		&entity.Chat{}, &tool.Tool{}, &console.Console{}, &game.Game{},
-		&tool.ToolFilesType{}, &console.ConsoleFileType{}, &console.ConsoleLanguage{},
-		&console.ConsolePlugin{}, &console.ConsolePluginsFile{},
-		&console.ConsoleConfig{}, &game.GameDisk{}, &game.GameAdditionalFile{},
-		&game.GameConfig{}, &entity.UserVariable{})
+	return sqliteDelegate.database.AutoMigrate(&User{},
+		&Chat{}, &Tool{}, &Console{}, &Game{},
+		&ToolFilesType{}, &ConsoleFileType{}, &ConsoleLanguage{},
+		&ConsolePlugin{}, &ConsolePluginsFile{},
+		&ConsoleConfig{}, &GameDisk{}, &GameAdditionalFile{},
+		&GameConfig{}, &UserVariable{})
 }
 
 func (sqliteDelegate *SQLiteDelegate) Close() (err error) {
@@ -54,14 +51,14 @@ func (sqliteDelegate *SQLiteDelegate) Close() (err error) {
 	return
 }
 
-func (sqliteDelegate *SQLiteDelegate) Create(value interface{}) error {
+func (sqliteDelegate *SQLiteDelegate) create(value interface{}) error {
 	if result := sqliteDelegate.database.Create(value); result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (sqliteDelegate *SQLiteDelegate) CreateOrUpdate(value interface{}) error {
+func (sqliteDelegate *SQLiteDelegate) createOrUpdate(value interface{}) error {
 	if result := sqliteDelegate.database.Clauses(clause.OnConflict{
 		UpdateAll: true,
 	}).Create(value); result.Error != nil {
@@ -70,9 +67,14 @@ func (sqliteDelegate *SQLiteDelegate) CreateOrUpdate(value interface{}) error {
 	return nil
 }
 
-func (sqliteDelegate *SQLiteDelegate) First(dest interface{}, conds ...interface{}) error {
+func (sqliteDelegate *SQLiteDelegate) first(dest interface{}, conds ...interface{}) error {
 	if result := sqliteDelegate.database.First(dest, conds); result.Error != nil {
 		return result.Error
 	}
+	return nil
+}
+
+func (sqliteDelegate *SQLiteDelegate) StoreImported(consoles []importer.Console, games []importer.Game, tools []importer.Tool) error {
+	// TODO
 	return nil
 }

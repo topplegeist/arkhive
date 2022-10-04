@@ -1,10 +1,12 @@
 package delegate
 
+import "arkhive.dev/launcher/internal/database/importer"
+
 type DatabaseDelegate interface {
 	Open(basePath string) error
 	Close() error
 	Migrate() error
-	Create(value interface{}) error
-	CreateOrUpdate(value interface{}) error
-	First(dest interface{}, conds ...interface{}) error
+	StoreImported([]importer.Console, []importer.Game, []importer.Tool) error
+	GetStoredDBHash() ([]byte, error)
+	SetStoredDBHash([]byte) error
 }

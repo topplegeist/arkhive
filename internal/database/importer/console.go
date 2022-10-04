@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"errors"
 	"strconv"
 )
 
@@ -54,11 +55,18 @@ type Console struct {
 }
 
 func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err error) {
-	if console, err = ConsoleFromJSON(slug, json); err != nil {
+	var (
+		entityObject map[string]interface{}
+		ok            bool
+	)
+	if entityObject, ok = json.(map[string]interface{}); !ok {
+		err = errors.New("the console JSON is not an object")
 		return
 	}
-	consoleObject := json.(map[string]interface{})
-	consoleFileTypesObject, _ := consoleObject["file_types"].(map[string]interface{})
+	if console, err = ConsoleFromJSON(slug, entityObject); err != nil {
+		return
+	}
+	consoleFileTypesObject, _ := entityObject["file_types"].(map[string]interface{})
 	for actionKey, actionValue := range consoleFileTypesObject {
 		for _, fileType := range actionValue.([]interface{}) {
 			var consoleFileType ConsoleFileType
@@ -68,7 +76,7 @@ func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err
 			console.FileTypes = append(console.FileTypes, consoleFileType)
 		}
 	}
-	for levelKey, levelValue := range consoleObject {
+	for levelKey, levelValue := range entityObject {
 		if ConsoleConfigIsLevel(levelKey) {
 			consoleLevelObject := levelValue.(map[string]interface{})
 			for consoleConfigName, consoleConfigValue := range consoleLevelObject {
@@ -80,7 +88,7 @@ func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err
 			}
 		}
 	}
-	if consoleLanguageObject, ok := consoleObject["language"].(map[string]interface{}); ok {
+	if consoleLanguageObject, ok := entityObject["language"].(map[string]interface{}); ok {
 		consoleLanguageMappingObject, _ := consoleLanguageObject["mapping"].(map[string]interface{})
 		for languageIDKey, languageIDValue := range consoleLanguageMappingObject {
 			for _, languageEntry := range languageIDValue.([]interface{}) {
@@ -96,7 +104,7 @@ func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err
 			}
 		}
 	}
-	if consolePluginsObject, ok := consoleObject["plugins"].(map[string]interface{}); ok {
+	if consolePluginsObject, ok := entityObject["plugins"].(map[string]interface{}); ok {
 		for pluginKey, pluginValue := range consolePluginsObject {
 			var consolePlugin ConsolePlugin
 			consolePlugin, err = ConsolePluginFromJSON(pluginKey)
@@ -134,9 +142,9 @@ func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err
 	return
 }
 
-func ConsoleFromJSON(slug string, json interface{}) (instance Console, err error) {
+func ConsoleFromJSON(slug string, json map[string]interface{}) (instance Console, err error) {
 	var languageVariableName *string = nil
-	if languageObject, ok := json.(map[string]interface{})["language"]; ok {
+	if languageObject, ok := json["language"]; ok {
 		if languageVariableNameObject, ok := languageObject.(map[string]interface{})["variable_name"]; ok {
 			languageVariableNameVariable := languageVariableNameObject.(string)
 			languageVariableName = &languageVariableNameVariable
@@ -144,10 +152,10 @@ func ConsoleFromJSON(slug string, json interface{}) (instance Console, err error
 	}
 	instance = Console{
 		slug,
-		json.(map[string]interface{})["core_location"].(string),
-		json.(map[string]interface{})["name"].(string),
-		json.(map[string]interface{})["single_file"].(bool),
-		json.(map[string]interface{})["is_embedded"].(bool),
+		json["core_location"].(string),
+		json["name"].(string),
+		json["single_file"].(bool),
+		json["is_embedded"].(bool),
 		languageVariableName,
 		[]ConsolePlugin{},
 		[]ConsoleFileType{},

@@ -96,9 +96,9 @@ func (p *PlainImporter) decode(databaseData []byte) (err error) {
 
 	if jsonEntities, ok := database["consoles"]; ok {
 		if jsonEntitiesMap, ok := jsonEntities.(map[string]interface{}); ok {
-			for _, entity := range jsonEntitiesMap {
+			for slug, entity := range jsonEntitiesMap {
 				var console Console
-				if console, err = PlainDatabaseToConsole(entity); err != nil {
+				if console, err = PlainDatabaseToConsole(slug, entity); err != nil {
 					return
 				}
 				p.consoles = append(p.consoles, console)
@@ -121,28 +121,28 @@ func (p *PlainImporter) decode(databaseData []byte) (err error) {
 				p.games = append(p.games, game)
 			}
 		} else {
-			err = errors.New("Console field is not an array")
+			err = errors.New("Game field is not an array")
 			return
 		}
 	} else {
-		logrus.Warn("No consoles parsed during the database import")
+		logrus.Warn("No games parsed during the database import")
 	}
 
 	if jsonEntities, ok := database["win_tools"]; ok {
 		if jsonEntitiesMap, ok := jsonEntities.(map[string]interface{}); ok {
-			for _, entity := range jsonEntitiesMap {
+			for slug, entity := range jsonEntitiesMap {
 				var tool Tool
-				if tool, err = PlainDatabaseToTool(entity); err != nil {
+				if tool, err = PlainDatabaseToTool(slug, entity); err != nil {
 					return
 				}
 				p.tools = append(p.tools, tool)
 			}
 		} else {
-			err = errors.New("Console field is not an array")
+			err = errors.New("Tool field is not an array")
 			return
 		}
 	} else {
-		logrus.Warn("No consoles parsed during the database import")
+		logrus.Warn("No tools parsed during the database import")
 	}
 
 	return

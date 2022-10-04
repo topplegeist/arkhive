@@ -1,4 +1,4 @@
-package entity
+package sqlite
 
 import "time"
 

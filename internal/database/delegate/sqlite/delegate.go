@@ -14,13 +14,13 @@ import (
 
 type SQLiteDelegate struct{ database *gorm.DB }
 
-func (sqliteDelegate *SQLiteDelegate) Open(basePath string) (err error) {
+func (s *SQLiteDelegate) Open(basePath string) (err error) {
 	databasePath := filepath.Join(basePath, folder.DatabasePath)
 	if err = os.Mkdir(filepath.Dir(databasePath), 0755); err != nil {
 		return
 	}
 	dialector := sqlite.Open(databasePath)
-	if sqliteDelegate.database, err = gorm.Open(dialector, &gorm.Config{
+	if s.database, err = gorm.Open(dialector, &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 	}); err != nil {
 		return
@@ -28,8 +28,8 @@ func (sqliteDelegate *SQLiteDelegate) Open(basePath string) (err error) {
 	return
 }
 
-func (sqliteDelegate *SQLiteDelegate) Migrate() (err error) {
-	return sqliteDelegate.database.AutoMigrate(&User{},
+func (d *SQLiteDelegate) Migrate() (err error) {
+	return d.database.AutoMigrate(&User{},
 		&Chat{}, &Tool{}, &Console{}, &Game{},
 		&ToolFilesType{}, &ConsoleFileType{}, &ConsoleLanguage{},
 		&ConsolePlugin{}, &ConsolePluginsFile{},
@@ -37,12 +37,12 @@ func (sqliteDelegate *SQLiteDelegate) Migrate() (err error) {
 		&GameConfig{}, &UserVariable{})
 }
 
-func (sqliteDelegate *SQLiteDelegate) Close() (err error) {
-	if sqliteDelegate.database == nil {
+func (d *SQLiteDelegate) Close() (err error) {
+	if d.database == nil {
 		return
 	}
 	var database *sql.DB
-	if database, err = sqliteDelegate.database.DB(); err != nil {
+	if database, err = d.database.DB(); err != nil {
 		return
 	}
 	if err = database.Close(); err != nil {
@@ -51,15 +51,15 @@ func (sqliteDelegate *SQLiteDelegate) Close() (err error) {
 	return
 }
 
-func (sqliteDelegate *SQLiteDelegate) create(value interface{}) error {
-	if result := sqliteDelegate.database.Create(value); result.Error != nil {
+func (d *SQLiteDelegate) create(value interface{}) error {
+	if result := d.database.Create(value); result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (sqliteDelegate *SQLiteDelegate) createOrUpdate(value interface{}) error {
-	if result := sqliteDelegate.database.Clauses(clause.OnConflict{
+func (d *SQLiteDelegate) createOrUpdate(value interface{}) error {
+	if result := d.database.Clauses(clause.OnConflict{
 		UpdateAll: true,
 	}).Create(value); result.Error != nil {
 		return result.Error
@@ -67,14 +67,28 @@ func (sqliteDelegate *SQLiteDelegate) createOrUpdate(value interface{}) error {
 	return nil
 }
 
-func (sqliteDelegate *SQLiteDelegate) first(dest interface{}, conds ...interface{}) error {
-	if result := sqliteDelegate.database.First(dest, conds); result.Error != nil {
+func (d *SQLiteDelegate) first(dest interface{}, conds ...interface{}) error {
+	if result := d.database.First(dest, conds); result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (sqliteDelegate *SQLiteDelegate) StoreImported(consoles []importer.Console, games []importer.Game, tools []importer.Tool) error {
-	// TODO
+func (d *SQLiteDelegate) StoreImported(consoles []importer.Console, games []importer.Game, tools []importer.Tool) (err error) {
+	for _, entity := range consoles {
+		if err = d.storeImportedConsole(entity); err != nil {
+			return
+		}
+	}
+	for _, entity := range consoles {
+		if err = d.storeImportedGame(entity); err != nil {
+			return
+		}
+	}
+	for _, entity := range consoles {
+		if err = d.storeImportedTool(entity); err != nil {
+			return
+		}
+	}
 	return nil
 }

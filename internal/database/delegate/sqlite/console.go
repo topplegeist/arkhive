@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"database/sql"
+
+	"arkhive.dev/launcher/internal/database/importer"
 )
 
 type Console struct {
@@ -11,7 +13,33 @@ type Console struct {
 	SingleFile           bool   `gorm:"not null"`
 	LanguageVariableName sql.NullString
 	IsEmbedded           bool `gorm:"not null"`
-	ConsolePlugins       []ConsolePlugin
+}
+
+func (d *SQLiteDelegate) storeImportedConsole(importedEntity importer.Console) (err error) {
+	languageVariableName := sql.NullString{}
+	if importedEntity.LanguageVariableName != nil {
+		languageVariableName.Valid = true
+		languageVariableName.String = *importedEntity.LanguageVariableName
+	}
+	entity := Console{
+		importedEntity.Slug,
+		importedEntity.CoreLocation,
+		importedEntity.Name,
+		importedEntity.SingleFile,
+		languageVariableName,
+		importedEntity.IsEmbedded,
+	}
+
+	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
+		return entityCreationTransaction.Error
+	}
+
+	for _, plugin := range importedEntity.Plugins {
+		if err = d.storeImportedPlugin(entity.Slug, plugin); err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (d *SQLiteDelegate) GetConsoles() (entity []Console, err error) {

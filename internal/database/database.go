@@ -27,8 +27,8 @@ func (d *Database) Initialize(waitGroup *sync.WaitGroup) {
 	var err error
 	// Create or update the database if needed
 	logrus.Info("Connecting to database")
-	if ok := d.connectToDatabase(); !ok {
-		panic("cannot open database")
+	if err = d.connectToDatabase(); err != nil {
+		panic(err)
 	}
 	logrus.Info("Applying database migrations")
 	if err = d.applyMigrations(); err != nil {
@@ -41,10 +41,6 @@ func (d *Database) Initialize(waitGroup *sync.WaitGroup) {
 		logrus.Error("Cannot decode the stored database hash")
 		panic(err)
 	}
-	hashHasBeenStored := len(storedDBHash) > 0
-	if !hashHasBeenStored {
-		logrus.Info("Cannot get the stored database hash")
-	}
 
 	// Import the database from the higher priority importer to the lower
 	var encryptedDBHash []byte
@@ -56,7 +52,7 @@ func (d *Database) Initialize(waitGroup *sync.WaitGroup) {
 	for _, importer := range d.importers {
 		encryptedDBHash, err = importer.Import(storedDBHash)
 		if err != nil {
-			panic("error importing the database")
+			panic(err)
 		}
 		if encryptedDBHash != nil {
 			importedConsoles = importer.GetConsoles()
@@ -70,9 +66,10 @@ func (d *Database) Initialize(waitGroup *sync.WaitGroup) {
 	if encryptedDBHash != nil {
 		logrus.Info("Storing the new imported database")
 		if err = d.delegate.StoreImported(importedConsoles, importedGames, importedTools); err != nil {
-			return
+			logrus.Error(err)
+		} else if err = d.delegate.SetStoredDBHash(encryptedDBHash); err != nil {
+			panic(err)
 		}
-		d.delegate.SetStoredDBHash(encryptedDBHash)
 	}
 
 	// End the routine
@@ -83,8 +80,8 @@ func (d *Database) Deinitialize() {
 	d.delegate.Close()
 }
 
-func (d *Database) connectToDatabase() bool {
-	return d.delegate.Open(d.basePath) == nil
+func (d *Database) connectToDatabase() error {
+	return d.delegate.Open(d.basePath)
 }
 
 func (d Database) applyMigrations() (err error) {

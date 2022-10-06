@@ -15,7 +15,7 @@ type MockDelegate struct {
 	Stored            bool
 }
 
-func (m *MockDelegate) Open(basePath string) (err error) {
+func (m *MockDelegate) Open() (err error) {
 	if m.FailOpen {
 		return m.Error
 	}

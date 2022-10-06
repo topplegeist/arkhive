@@ -9,14 +9,12 @@ import (
 )
 
 type Database struct {
-	basePath  string
 	delegate  delegate.DatabaseDelegate
 	importers []importer.Importer
 }
 
-func NewDatabase(basePath string, delegate delegate.DatabaseDelegate, importers []importer.Importer) (instance *Database) {
+func NewDatabase(delegate delegate.DatabaseDelegate, importers []importer.Importer) (instance *Database) {
 	instance = &Database{
-		basePath:  basePath,
 		delegate:  delegate,
 		importers: importers,
 	}
@@ -81,7 +79,7 @@ func (d *Database) Deinitialize() {
 }
 
 func (d *Database) connectToDatabase() error {
-	return d.delegate.Open(d.basePath)
+	return d.delegate.Open()
 }
 
 func (d Database) applyMigrations() (err error) {

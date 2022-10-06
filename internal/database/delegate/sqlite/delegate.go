@@ -12,10 +12,13 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type SQLiteDelegate struct{ database *gorm.DB }
+type SQLiteDelegate struct {
+	database *gorm.DB
+	BasePath string
+}
 
-func (s *SQLiteDelegate) Open(basePath string) (err error) {
-	databasePath := filepath.Join(basePath, folder.DatabasePath)
+func (s *SQLiteDelegate) Open() (err error) {
+	databasePath := filepath.Join(s.BasePath, folder.DatabasePath)
 	if err = os.Mkdir(filepath.Dir(databasePath), 0755); err != nil {
 		return
 	}

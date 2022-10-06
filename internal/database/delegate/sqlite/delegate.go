@@ -80,12 +80,12 @@ func (d *SQLiteDelegate) StoreImported(consoles []importer.Console, games []impo
 			return
 		}
 	}
-	for _, entity := range consoles {
+	for _, entity := range games {
 		if err = d.storeImportedGame(entity); err != nil {
 			return
 		}
 	}
-	for _, entity := range consoles {
+	for _, entity := range tools {
 		if err = d.storeImportedTool(entity); err != nil {
 			return
 		}

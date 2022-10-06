@@ -9,7 +9,7 @@ type Tool struct {
 	Url            string
 	CollectionPath *string
 	Destination    *string
-	Type           []string
+	Types           []string
 }
 
 func PlainDatabaseToTool(slug string, json interface{}) (tool Tool, err error) {
@@ -30,7 +30,7 @@ func PlainDatabaseToTool(slug string, json interface{}) (tool Tool, err error) {
 		for _, toolFileTypeObject := range toolFileTypesObject {
 			var toolFileType string
 			if toolFileType, ok = toolFileTypeObject.(string); ok {
-				tool.Type = append(tool.Type, toolFileType)
+				tool.Types = append(tool.Types, toolFileType)
 			}
 		}
 	}

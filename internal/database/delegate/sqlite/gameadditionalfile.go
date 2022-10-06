@@ -1,8 +1,23 @@
 package sqlite
 
+import "arkhive.dev/launcher/internal/database/importer"
+
 type GameAdditionalFile struct {
-	Name   string `gorm:"not null"`
 	GameID string `gorm:"not null"`
-	Game   Game
+	Name   string `gorm:"not null"`
 	Data   []byte `gorm:"not null"`
+}
+
+func (d *SQLiteDelegate) storeImportedGameAdditionalFile(slug string, importedEntity importer.GameAdditionalFile) (err error) {
+	entity := GameAdditionalFile{
+		slug,
+		importedEntity.Name,
+		importedEntity.Data,
+	}
+
+	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
+		return entityCreationTransaction.Error
+	}
+
+	return
 }

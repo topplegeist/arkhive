@@ -1,8 +1,6 @@
 package sqlite
 
 import (
-	"database/sql"
-
 	"arkhive.dev/launcher/internal/database/importer"
 )
 

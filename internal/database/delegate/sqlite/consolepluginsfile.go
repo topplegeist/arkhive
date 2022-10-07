@@ -31,8 +31,8 @@ func (d *SQLiteDelegate) storeImportedPluginsFile(consolePluginId uint, imported
 		CollectionPath:  collectionPath,
 	}
 
-	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
-		return entityCreationTransaction.Error
+	if err = d.create(&entity); err != nil {
+		return
 	}
 
 	return

@@ -14,8 +14,8 @@ func (d *SQLiteDelegate) storeImportedPlugin(consoleId string, importedEntity im
 		Type:      importedEntity.Type,
 	}
 
-	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
-		return entityCreationTransaction.Error
+	if err = d.create(&entity); err != nil {
+		return
 	}
 
 	for _, file := range importedEntity.Files {

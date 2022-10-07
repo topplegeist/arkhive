@@ -31,8 +31,8 @@ func (d *SQLiteDelegate) storeImportedTool(importedEntity importer.Tool) (err er
 		destination,
 	}
 
-	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
-		return entityCreationTransaction.Error
+	if err = d.create(&entity); err != nil {
+		return
 	}
 
 	for _, toolType := range importedEntity.Types {

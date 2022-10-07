@@ -45,8 +45,8 @@ func (d *SQLiteDelegate) storeImportedGame(importedEntity importer.Game) (err er
 		time.Now(),
 	}
 
-	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
-		return entityCreationTransaction.Error
+	if err = d.create(&entity); err != nil {
+		return
 	}
 
 	for _, disk := range importedEntity.Disks {

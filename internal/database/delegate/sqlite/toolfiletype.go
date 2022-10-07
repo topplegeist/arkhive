@@ -11,8 +11,8 @@ func (d *SQLiteDelegate) storeImportedToolFilesType(slug string, toolType string
 		toolType,
 	}
 
-	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
-		return entityCreationTransaction.Error
+	if err = d.create(&entity); err != nil {
+		return
 	}
 	return
 }

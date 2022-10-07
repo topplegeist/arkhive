@@ -15,8 +15,8 @@ func (d *SQLiteDelegate) storeImportedGameAdditionalFile(slug string, importedEn
 		importedEntity.Data,
 	}
 
-	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
-		return entityCreationTransaction.Error
+	if err = d.create(&entity); err != nil {
+		return
 	}
 
 	return

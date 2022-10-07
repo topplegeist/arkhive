@@ -35,10 +35,29 @@ func (d *SQLiteDelegate) storeImportedConsole(importedEntity importer.Console) (
 	}
 
 	for _, plugin := range importedEntity.Plugins {
-		if err = d.storeImportedPlugin(entity.Slug, plugin); err != nil {
+		if err = d.storeImportedConsolePlugin(entity.Slug, plugin); err != nil {
 			return
 		}
 	}
+
+	for _, fileType := range importedEntity.FileTypes {
+		if err = d.storeImportedConsoleFileType(entity.Slug, fileType); err != nil {
+			return
+		}
+	}
+
+	for _, config := range importedEntity.Configs {
+		if err = d.storeImportedConsoleConfig(entity.Slug, config); err != nil {
+			return
+		}
+	}
+
+	for _, language := range importedEntity.Languages {
+		if err = d.storeImportedConsoleLanguage(entity.Slug, language); err != nil {
+			return
+		}
+	}
+
 	return
 }
 

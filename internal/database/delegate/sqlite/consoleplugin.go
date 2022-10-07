@@ -8,7 +8,7 @@ type ConsolePlugin struct {
 	Type      string `gorm:"not null"`
 }
 
-func (d *SQLiteDelegate) storeImportedPlugin(consoleId string, importedEntity importer.ConsolePlugin) (err error) {
+func (d *SQLiteDelegate) storeImportedConsolePlugin(consoleId string, importedEntity importer.ConsolePlugin) (err error) {
 	entity := ConsolePlugin{
 		ConsoleID: consoleId,
 		Type:      importedEntity.Type,
@@ -19,7 +19,7 @@ func (d *SQLiteDelegate) storeImportedPlugin(consoleId string, importedEntity im
 	}
 
 	for _, file := range importedEntity.Files {
-		if err = d.storeImportedPluginsFile(entity.Id, file); err != nil {
+		if err = d.storeImportedConsolePluginsFile(entity.Id, file); err != nil {
 			return
 		}
 	}

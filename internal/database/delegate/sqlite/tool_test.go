@@ -37,7 +37,7 @@ func TestStoreImportedTool(t *testing.T) {
 		t.Fail()
 	}
 
-	if entities, err := s.GetTools(); err != nil {
+	if entities, err := s.GetTools(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -49,7 +49,7 @@ func TestStoreImportedTool(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetToolFileTypes(); err != nil {
+	if entities, err := s.GetToolFileTypes(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {

@@ -58,7 +58,7 @@ func TestStoreImportedGame(t *testing.T) {
 		t.Fail()
 	}
 
-	if entities, err := s.GetGames(); err != nil {
+	if entities, err := s.GetGames(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -75,7 +75,7 @@ func TestStoreImportedGame(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetGameDisks(); err != nil {
+	if entities, err := s.GetGameDisks(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -88,7 +88,7 @@ func TestStoreImportedGame(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetGameConfigs(); err != nil {
+	if entities, err := s.GetGameConfigs(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -99,7 +99,7 @@ func TestStoreImportedGame(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetGameAdditionalFiles(); err != nil {
+	if entities, err := s.GetGameAdditionalFiles(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {

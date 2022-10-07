@@ -13,7 +13,7 @@ type ConsolePluginsFile struct {
 	CollectionPath  sql.NullString
 }
 
-func (d *SQLiteDelegate) storeImportedPluginsFile(consolePluginId uint, importedEntity importer.ConsolePluginsFile) (err error) {
+func (d *SQLiteDelegate) storeImportedConsolePluginsFile(consolePluginId uint, importedEntity importer.ConsolePluginsFile) (err error) {
 	destination := sql.NullString{}
 	if importedEntity.Destination != nil {
 		destination.Valid = true

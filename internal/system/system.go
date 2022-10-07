@@ -402,7 +402,6 @@ func (systemEngine *SystemEngine) coreIsDownloaded(consoleEntry *console.Console
 }
 
 func (systemEngine *SystemEngine) coreIsUpdated(_ *console.Console) bool {
-	// ToDo: Check core updates from retroarch buildbot
 	return true
 }
 
@@ -429,7 +428,6 @@ func (systemEngine *SystemEngine) toolIsDownloaded(toolEntry *tool.Tool) bool {
 }
 
 func (systemEngine *SystemEngine) toolIsUpdated(_ *tool.Tool) bool {
-	// ToDo: Check core updates from retroarch buildbot
 	return true
 }
 

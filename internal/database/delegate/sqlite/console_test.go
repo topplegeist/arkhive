@@ -60,7 +60,7 @@ func TestStoreImportedConsole(t *testing.T) {
 		t.Fail()
 	}
 
-	if entities, err := s.GetConsoles(); err != nil {
+	if entities, err := s.GetConsoles(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -75,7 +75,7 @@ func TestStoreImportedConsole(t *testing.T) {
 	}
 
 	var consolePluginId uint
-	if entities, err := s.GetConsolePlugins(); err != nil {
+	if entities, err := s.GetConsolePlugins(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -87,7 +87,7 @@ func TestStoreImportedConsole(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetConsolePluginsFiles(); err != nil {
+	if entities, err := s.GetConsolePluginsFiles(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -99,7 +99,7 @@ func TestStoreImportedConsole(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetConsoleFileTypes(); err != nil {
+	if entities, err := s.GetConsoleFileTypes(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -110,7 +110,7 @@ func TestStoreImportedConsole(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetConsoleConfigs(); err != nil {
+	if entities, err := s.GetConsoleConfigs(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -122,13 +122,13 @@ func TestStoreImportedConsole(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetConsoleLanguages(); err != nil {
+	if entities, err := s.GetConsoleLanguages(); err != nil || len(entities) == 0 {
 		t.Log(err)
 		t.Fail()
 	} else {
 		for _, entity := range entities {
 			assert.Equal(t, "Slug", entity.ConsoleID)
-			assert.Equal(t, 1, entity.Tag)
+			assert.Equal(t, uint(1), entity.Tag)
 			assert.Equal(t, "Name", entity.Name)
 		}
 	}

@@ -232,7 +232,6 @@ func (networkEngine *NetworkEngine) AddResource(url *url.URL, path string, allow
 	}
 	if err == nil {
 		resource = resources.NewResource(resourceHandler, path, allowedFiles)
-		// ToDo: connections
 		go resource.Download()
 	}
 	return

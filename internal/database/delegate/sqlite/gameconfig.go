@@ -23,3 +23,11 @@ func (d *SQLiteDelegate) storeImportedGameConfig(slug string, importedEntity imp
 
 	return
 }
+
+func (d *SQLiteDelegate) GetGameConfigs() (entity []GameConfig, err error) {
+	if result := d.database.Find(&entity); result.Error != nil {
+		err = result.Error
+		return
+	}
+	return
+}

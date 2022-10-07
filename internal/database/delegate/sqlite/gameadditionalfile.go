@@ -21,3 +21,11 @@ func (d *SQLiteDelegate) storeImportedGameAdditionalFile(slug string, importedEn
 
 	return
 }
+
+func (d *SQLiteDelegate) GetGameAdditionalFiles() (entity []GameAdditionalFile, err error) {
+	if result := d.database.Find(&entity); result.Error != nil {
+		err = result.Error
+		return
+	}
+	return
+}

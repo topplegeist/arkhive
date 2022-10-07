@@ -49,20 +49,28 @@ func (d *SQLiteDelegate) storeImportedGame(importedEntity importer.Game) (err er
 		return entityCreationTransaction.Error
 	}
 
-	for _, disk := range importedEntity.Disks{
+	for _, disk := range importedEntity.Disks {
 		if err = d.storeImportedGameDisk(entity.Slug, disk); err != nil {
 			return
 		}
 	}
-	for _, config := range importedEntity.Configs{
+	for _, config := range importedEntity.Configs {
 		if err = d.storeImportedGameConfig(entity.Slug, config); err != nil {
 			return
 		}
 	}
-	for _, additionalFile := range importedEntity.AdditionalFiles{
+	for _, additionalFile := range importedEntity.AdditionalFiles {
 		if err = d.storeImportedGameAdditionalFile(entity.Slug, additionalFile); err != nil {
 			return
 		}
+	}
+	return
+}
+
+func (d *SQLiteDelegate) GetGames() (entity []Game, err error) {
+	if result := d.database.Find(&entity); result.Error != nil {
+		err = result.Error
+		return
 	}
 	return
 }

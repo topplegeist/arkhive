@@ -39,3 +39,11 @@ func (d *SQLiteDelegate) storeImportedGameDisk(slug string, importedEntity impor
 
 	return
 }
+
+func (d *SQLiteDelegate) GetGameDisks() (entity []GameDisk, err error) {
+	if result := d.database.Find(&entity); result.Error != nil {
+		err = result.Error
+		return
+	}
+	return
+}

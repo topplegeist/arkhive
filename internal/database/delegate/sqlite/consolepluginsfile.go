@@ -25,15 +25,24 @@ func (d *SQLiteDelegate) storeImportedPluginsFile(consolePluginId uint, imported
 		collectionPath.String = *importedEntity.CollectionPath
 	}
 	entity := ConsolePluginsFile{
-		Url:            importedEntity.Url,
-		Destination:    destination,
-		CollectionPath: collectionPath,
+		ConsolePluginID: consolePluginId,
+		Url:             importedEntity.Url,
+		Destination:     destination,
+		CollectionPath:  collectionPath,
 	}
 
 	if entityCreationTransaction := d.database.Create(&entity); entityCreationTransaction.Error != nil {
 		return entityCreationTransaction.Error
 	}
 
+	return
+}
+
+func (d *SQLiteDelegate) GetConsolePluginsFiles() (entity []ConsolePluginsFile, err error) {
+	if result := d.database.Find(&entity); result.Error != nil {
+		err = result.Error
+		return
+	}
 	return
 }
 

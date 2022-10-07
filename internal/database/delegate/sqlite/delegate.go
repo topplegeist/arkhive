@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -19,7 +20,7 @@ type SQLiteDelegate struct {
 
 func (s *SQLiteDelegate) Open() (err error) {
 	databasePath := filepath.Join(s.BasePath, folder.DatabasePath)
-	if err = os.Mkdir(filepath.Dir(databasePath), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(databasePath), 0755); err != nil {
 		return
 	}
 	dialector := sqlite.Open(databasePath)
@@ -32,6 +33,9 @@ func (s *SQLiteDelegate) Open() (err error) {
 }
 
 func (d *SQLiteDelegate) Migrate() (err error) {
+	if d.database == nil {
+		return errors.New("no database instance")
+	}
 	return d.database.AutoMigrate(&User{},
 		&Chat{}, &Tool{}, &Console{}, &Game{},
 		&ToolFilesType{}, &ConsoleFileType{}, &ConsoleLanguage{},
@@ -42,7 +46,7 @@ func (d *SQLiteDelegate) Migrate() (err error) {
 
 func (d *SQLiteDelegate) Close() (err error) {
 	if d.database == nil {
-		return
+		return errors.New("no database instance")
 	}
 	var database *sql.DB
 	if database, err = d.database.DB(); err != nil {

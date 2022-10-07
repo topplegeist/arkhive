@@ -3,7 +3,7 @@ package sqlite
 import "arkhive.dev/launcher/internal/database/importer"
 
 type ConsolePlugin struct {
-	Id        uint   `gorm:"primaryKey"`
+	Id        uint   `gorm:"primaryKey;autoIncrement"`
 	ConsoleID string `gorm:"not null"`
 	Type      string `gorm:"not null"`
 }
@@ -24,6 +24,14 @@ func (d *SQLiteDelegate) storeImportedPlugin(consoleId string, importedEntity im
 		}
 	}
 
+	return
+}
+
+func (d *SQLiteDelegate) GetConsolePlugins() (entity []ConsolePlugin, err error) {
+	if result := d.database.Find(&entity); result.Error != nil {
+		err = result.Error
+		return
+	}
 	return
 }
 

@@ -57,7 +57,7 @@ type Console struct {
 func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err error) {
 	var (
 		entityObject map[string]interface{}
-		ok            bool
+		ok           bool
 	)
 	if entityObject, ok = json.(map[string]interface{}); !ok {
 		err = errors.New("the console JSON is not an object")

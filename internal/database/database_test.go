@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const TEST_FOLDER_PATH = "test"
-
 func baseInitialize(instance *database.Database) {
 	defer instance.Deinitialize()
 	waitGroup := sync.WaitGroup{}

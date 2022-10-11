@@ -35,7 +35,31 @@ func storeImportedGameTestProthotype(t *testing.T, flags GameTestFlags) {
 	collectionPath := "collectionPath"
 	startingTime := time.Now().UnixNano()
 
-	
+	var disks []importer.GameDisk
+	if flags.ImportDisks {
+		disks = append(disks, importer.GameDisk{
+			DiskNumber:     1,
+			Url:            "Url",
+			Image:          &image,
+			CollectionPath: &collectionPath,
+		})
+	}
+
+	var configs []importer.GameConfig
+	if flags.ImportDisks {
+		configs = append(configs, importer.GameConfig{
+			Name:  "Name",
+			Value: "Value",
+		})
+	}
+
+	var additionalFiles []importer.GameAdditionalFile
+	if flags.ImportAdditionalFiles {
+		additionalFiles = append(additionalFiles, importer.GameAdditionalFile{
+			Name: "Name",
+			Data: []byte("Data"),
+		})
+	}
 
 	if err := s.StoreImported(
 		[]importer.Console{},
@@ -47,20 +71,9 @@ func storeImportedGameTestProthotype(t *testing.T, flags GameTestFlags) {
 			BackgroundImage: &backgroundImage,
 			Logo:            &logo,
 			Executable:      &executable,
-			Disks: []importer.GameDisk{{
-				DiskNumber:     1,
-				Url:            "Url",
-				Image:          &image,
-				CollectionPath: &collectionPath,
-			}},
-			Configs: []importer.GameConfig{{
-				Name:  "Name",
-				Value: "Value",
-			}},
-			AdditionalFiles: []importer.GameAdditionalFile{{
-				Name: "Name",
-				Data: []byte("Data"),
-			}},
+			Disks:           disks,
+			Configs:         configs,
+			AdditionalFiles: additionalFiles,
 		}},
 		[]importer.Tool{}); err != nil {
 		t.Log(err)
@@ -84,7 +97,7 @@ func storeImportedGameTestProthotype(t *testing.T, flags GameTestFlags) {
 		}
 	}
 
-	if entities, err := s.GetGameDisks(); err != nil || len(entities) == 0 {
+	if entities, err := s.GetGameDisks(); err != nil || (len(entities) == 0 && flags.ImportDisks) {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -97,7 +110,7 @@ func storeImportedGameTestProthotype(t *testing.T, flags GameTestFlags) {
 		}
 	}
 
-	if entities, err := s.GetGameConfigs(); err != nil || len(entities) == 0 {
+	if entities, err := s.GetGameConfigs(); err != nil || (len(entities) == 0 && flags.ImportConfigs) {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -108,7 +121,7 @@ func storeImportedGameTestProthotype(t *testing.T, flags GameTestFlags) {
 		}
 	}
 
-	if entities, err := s.GetGameAdditionalFiles(); err != nil || len(entities) == 0 {
+	if entities, err := s.GetGameAdditionalFiles(); err != nil || (len(entities) == 0 && flags.ImportAdditionalFiles) {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -124,5 +137,9 @@ func storeImportedGameTestProthotype(t *testing.T, flags GameTestFlags) {
 }
 
 func TestStoreImportedGame(t *testing.T) {
-
+	storeImportedGameTestProthotype(t, GameTestFlags{
+		ImportDisks:           true,
+		ImportConfigs:         true,
+		ImportAdditionalFiles: true,
+	})
 }

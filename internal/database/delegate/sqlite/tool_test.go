@@ -8,7 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStoreImportedTool(t *testing.T) {
+type ToolTestFlags struct {
+	ImportTypes bool
+}
+
+func storeImportedToolTestProthotype(t *testing.T, flags ToolTestFlags) {
 	clearTestEnvironment()
 	s := sqlite.SQLiteDelegate{
 		BasePath: TEST_FOLDER_PATH,
@@ -19,6 +23,10 @@ func TestStoreImportedTool(t *testing.T) {
 	}
 	if err := s.Migrate(); err != nil {
 		t.Fail()
+	}
+	var types []string
+	if flags.ImportTypes {
+		types = append(types, "Types")
 	}
 
 	destination := "destination"
@@ -31,7 +39,7 @@ func TestStoreImportedTool(t *testing.T) {
 			Url:            "Url",
 			CollectionPath: &collectionPath,
 			Destination:    &destination,
-			Types:          []string{"Types"},
+			Types:          types,
 		}}); err != nil {
 		t.Log(err)
 		t.Fail()
@@ -61,4 +69,10 @@ func TestStoreImportedTool(t *testing.T) {
 
 	s.Close()
 	clearTestEnvironment()
+}
+
+func TestStoreImportedTool(t *testing.T) {
+	storeImportedToolTestProthotype(t, ToolTestFlags{
+		ImportTypes: true,
+	})
 }

@@ -10,10 +10,12 @@ import (
 )
 
 type GameTestFlags struct {
-	ImportDisks: bool
+	ImportDisks           bool
+	ImportConfigs         bool
+	ImportAdditionalFiles bool
 }
 
-func storeImportedGameTestProthotype(t *testing.T, flags ConsoleTestFlags) {
+func storeImportedGameTestProthotype(t *testing.T, flags GameTestFlags) {
 	clearTestEnvironment()
 	s := sqlite.SQLiteDelegate{
 		BasePath: TEST_FOLDER_PATH,
@@ -32,6 +34,9 @@ func storeImportedGameTestProthotype(t *testing.T, flags ConsoleTestFlags) {
 	image := "image"
 	collectionPath := "collectionPath"
 	startingTime := time.Now().UnixNano()
+
+	
+
 	if err := s.StoreImported(
 		[]importer.Console{},
 		[]importer.Game{{

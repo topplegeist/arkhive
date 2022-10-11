@@ -9,7 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStoreImportedGame(t *testing.T) {
+type GameTestFlags struct {
+	ImportDisks: bool
+}
+
+func storeImportedGameTestProthotype(t *testing.T, flags ConsoleTestFlags) {
 	clearTestEnvironment()
 	s := sqlite.SQLiteDelegate{
 		BasePath: TEST_FOLDER_PATH,
@@ -112,4 +116,8 @@ func TestStoreImportedGame(t *testing.T) {
 
 	s.Close()
 	clearTestEnvironment()
+}
+
+func TestStoreImportedGame(t *testing.T) {
+
 }

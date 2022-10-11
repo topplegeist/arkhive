@@ -8,7 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStoreImportedConsole(t *testing.T) {
+type ConsoleTestFlags struct {
+	InsertPlugins   bool
+	InsertFileTypes bool
+	InsertConfigs   bool
+	InsertLanguages bool
+}
+
+func storeImportedConsoleTestProthotype(t *testing.T, flags ConsoleTestFlags) {
 	clearTestEnvironment()
 	s := sqlite.SQLiteDelegate{
 		BasePath: TEST_FOLDER_PATH,
@@ -24,6 +31,41 @@ func TestStoreImportedConsole(t *testing.T) {
 	languageVariableName := "languageVariableName"
 	destination := "destination"
 	collectionPath := "collectionPath"
+
+	var plugins []importer.ConsolePlugin
+	if flags.InsertPlugins {
+		plugins = append(plugins, importer.ConsolePlugin{
+			Type: "Type",
+			Files: []importer.ConsolePluginsFile{{
+				Url:            "Url",
+				Destination:    &destination,
+				CollectionPath: &collectionPath,
+			}},
+		})
+	}
+	var fileTypes []importer.ConsoleFileType
+	if flags.InsertFileTypes {
+		fileTypes = append(fileTypes, importer.ConsoleFileType{
+			FileType: "FileType",
+			Action:   "Action",
+		})
+	}
+	var configs []importer.ConsoleConfig
+	if flags.InsertConfigs {
+		configs = append(configs, importer.ConsoleConfig{
+			Name:  "Name",
+			Value: "Value",
+			Level: "Level",
+		})
+	}
+	var languages []importer.ConsoleLanguage
+	if flags.InsertLanguages {
+		languages = append(languages, importer.ConsoleLanguage{
+			Tag:  1,
+			Name: "Name",
+		})
+	}
+
 	if err := s.StoreImported(
 		[]importer.Console{{
 			Slug:                 "Slug",
@@ -32,27 +74,10 @@ func TestStoreImportedConsole(t *testing.T) {
 			SingleFile:           true,
 			IsEmbedded:           true,
 			LanguageVariableName: &languageVariableName,
-			Plugins: []importer.ConsolePlugin{{
-				Type: "Type",
-				Files: []importer.ConsolePluginsFile{{
-					Url:            "Url",
-					Destination:    &destination,
-					CollectionPath: &collectionPath,
-				}}},
-			},
-			FileTypes: []importer.ConsoleFileType{{
-				FileType: "FileType",
-				Action:   "Action",
-			}},
-			Configs: []importer.ConsoleConfig{{
-				Name:  "Name",
-				Value: "Value",
-				Level: "Level",
-			}},
-			Languages: []importer.ConsoleLanguage{{
-				Tag:  1,
-				Name: "Name",
-			}},
+			Plugins:              plugins,
+			FileTypes:            fileTypes,
+			Configs:              configs,
+			Languages:            languages,
 		}},
 		[]importer.Game{},
 		[]importer.Tool{}); err != nil {
@@ -75,7 +100,7 @@ func TestStoreImportedConsole(t *testing.T) {
 	}
 
 	var consolePluginId uint
-	if entities, err := s.GetConsolePlugins(); err != nil || len(entities) == 0 {
+	if entities, err := s.GetConsolePlugins(); err != nil || (len(entities) == 0 && flags.InsertPlugins) {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -87,7 +112,7 @@ func TestStoreImportedConsole(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetConsolePluginsFiles(); err != nil || len(entities) == 0 {
+	if entities, err := s.GetConsolePluginsFiles(); err != nil || (len(entities) == 0 && flags.InsertPlugins) {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -99,7 +124,7 @@ func TestStoreImportedConsole(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetConsoleFileTypes(); err != nil || len(entities) == 0 {
+	if entities, err := s.GetConsoleFileTypes(); err != nil || (len(entities) == 0 && flags.InsertFileTypes) {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -110,7 +135,7 @@ func TestStoreImportedConsole(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetConsoleConfigs(); err != nil || len(entities) == 0 {
+	if entities, err := s.GetConsoleConfigs(); err != nil || (len(entities) == 0 && flags.InsertConfigs) {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -122,7 +147,7 @@ func TestStoreImportedConsole(t *testing.T) {
 		}
 	}
 
-	if entities, err := s.GetConsoleLanguages(); err != nil || len(entities) == 0 {
+	if entities, err := s.GetConsoleLanguages(); err != nil || (len(entities) == 0 && flags.InsertLanguages) {
 		t.Log(err)
 		t.Fail()
 	} else {
@@ -135,4 +160,17 @@ func TestStoreImportedConsole(t *testing.T) {
 
 	s.Close()
 	clearTestEnvironment()
+}
+
+func TestStoreImportedConsole(t *testing.T) {
+	storeImportedConsoleTestProthotype(t, ConsoleTestFlags{
+		InsertPlugins:   true,
+		InsertFileTypes: true,
+		InsertConfigs:   true,
+		InsertLanguages: true,
+	})
+}
+
+func TestStoreImportedConsoleNoReferences(t *testing.T) {
+	storeImportedConsoleTestProthotype(t, ConsoleTestFlags{})
 }

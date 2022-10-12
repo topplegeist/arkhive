@@ -7,11 +7,12 @@ import (
 	"path/filepath"
 
 	"arkhive.dev/launcher/internal/database/importer"
-	"arkhive.dev/launcher/internal/folder"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+const DatabasePath = "data.sqllite3"
 
 type SQLiteDelegate struct {
 	database *gorm.DB
@@ -19,7 +20,7 @@ type SQLiteDelegate struct {
 }
 
 func (s *SQLiteDelegate) Open() (err error) {
-	databasePath := filepath.Join(s.BasePath, folder.DatabasePath)
+	databasePath := filepath.Join(s.BasePath, DatabasePath)
 	if err = os.MkdirAll(filepath.Dir(databasePath), 0755); err != nil {
 		return
 	}

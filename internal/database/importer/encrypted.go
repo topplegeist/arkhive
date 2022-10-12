@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"reflect"
 
-	"arkhive.dev/launcher/internal/folder"
 	"arkhive.dev/launcher/pkg/encryption"
 	"github.com/sirupsen/logrus"
 )
+
+const EncryptedDatabasePath = "db.honey"
+const DatabaseKeyPath = "private_key.bee"
 
 type EncryptedImporter struct {
 	plainImporter PlainImporter
@@ -40,7 +42,7 @@ func (e *EncryptedImporter) Import(currentDBHash []byte) (importedDBHash []byte,
 	// Load the user private key used to encrypt the database
 	logrus.Info("Loading database private key")
 	var privateKeyBytes []byte
-	if privateKeyBytes, err = os.ReadFile(filepath.Join(e.basePath, folder.DatabaseKeyPath)); err != nil {
+	if privateKeyBytes, err = os.ReadFile(filepath.Join(e.basePath, DatabaseKeyPath)); err != nil {
 		logrus.Error("Cannot read the secret key file")
 		return
 	}
@@ -52,7 +54,7 @@ func (e *EncryptedImporter) Import(currentDBHash []byte) (importedDBHash []byte,
 
 	// Load the encrypted database file
 	var encryptedDatabaseReader io.Reader
-	if encryptedDatabaseReader, err = os.Open(filepath.Join(e.basePath, folder.EncryptedDatabasePath)); err != nil {
+	if encryptedDatabaseReader, err = os.Open(filepath.Join(e.basePath, EncryptedDatabasePath)); err != nil {
 		logrus.Error("Cannot read the database key file")
 		return
 	}
@@ -82,7 +84,7 @@ func (e *EncryptedImporter) Import(currentDBHash []byte) (importedDBHash []byte,
 			return
 		}
 		var plainDatabaseFile *os.File
-		if plainDatabaseFile, err = os.OpenFile(filepath.Join(e.basePath, folder.PlainDatabasePath), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644); err != nil {
+		if plainDatabaseFile, err = os.OpenFile(filepath.Join(e.basePath, PlainDatabasePath), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644); err != nil {
 			return
 		}
 		defer plainDatabaseFile.Close()
@@ -102,9 +104,9 @@ func (e *EncryptedImporter) Import(currentDBHash []byte) (importedDBHash []byte,
 func (e *EncryptedImporter) canLoad() bool {
 	// Check if both the encrypted database file and the user private key exists
 	logrus.Debug("Checking if an encrypted database could be imported")
-	_, existenceFlag := os.Stat(filepath.Join(e.basePath, folder.EncryptedDatabasePath))
+	_, existenceFlag := os.Stat(filepath.Join(e.basePath, EncryptedDatabasePath))
 	encryptedDbFileExists := !os.IsNotExist(existenceFlag)
-	_, existenceFlag = os.Stat(filepath.Join(e.basePath, folder.DatabaseKeyPath))
+	_, existenceFlag = os.Stat(filepath.Join(e.basePath, DatabaseKeyPath))
 	keyFileExists := !os.IsNotExist(existenceFlag)
 	return encryptedDbFileExists && keyFileExists
 }

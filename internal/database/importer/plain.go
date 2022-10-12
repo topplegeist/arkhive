@@ -9,9 +9,10 @@ import (
 	"path/filepath"
 	"reflect"
 
-	"arkhive.dev/launcher/internal/folder"
 	"github.com/sirupsen/logrus"
 )
+
+const PlainDatabasePath = "db.json"
 
 type PlainImporter struct {
 	basePath string
@@ -57,14 +58,14 @@ func (p *PlainImporter) Import(currentDBHash []byte) (importedDBHash []byte, err
 func (p *PlainImporter) canLoad() bool {
 	// Check if a plain database file and the key file exists
 	logrus.Debug("Checking if a plain database could be imported")
-	_, existenceFlag := os.Stat(filepath.Join(p.basePath, folder.PlainDatabasePath))
+	_, existenceFlag := os.Stat(filepath.Join(p.basePath, PlainDatabasePath))
 	return !os.IsNotExist(existenceFlag)
 }
 
 func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encryptedDBHash []byte, err error) {
 	// Read the database file to be imported
 	var plainDatabaseFileReader *os.File
-	if plainDatabaseFileReader, err = os.Open(filepath.Join(p.basePath, folder.PlainDatabasePath)); err != nil {
+	if plainDatabaseFileReader, err = os.Open(filepath.Join(p.basePath, PlainDatabasePath)); err != nil {
 		logrus.Error("Cannot read the plain database file")
 		return
 	}

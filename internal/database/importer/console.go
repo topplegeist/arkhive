@@ -67,15 +67,81 @@ func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err
 		return
 	}
 	consoleFileTypesObject, _ := entityObject["file_types"].(map[string]interface{})
-	for actionKey, actionValue := range consoleFileTypesObject {
-		for _, fileType := range actionValue.([]interface{}) {
-			var consoleFileType ConsoleFileType
-			if consoleFileType, err = ConsoleFileTypeFromJSON(actionKey, fileType.(string)); err != nil {
-				return
-			}
-			console.FileTypes = append(console.FileTypes, consoleFileType)
+	if err = PlainConsoleFileTypesToObject(&console, consoleFileTypesObject); err != nil {
+		return
+	}
+	if err = PlainConsoleConfigToObject(&console, entityObject); err != nil {
+		return
+	}
+	if consoleLanguageObject, ok := entityObject["language"].(map[string]interface{}); ok {
+		if err = PlainConsoleLanguageToObject(&console, consoleLanguageObject); err != nil {
+			return
 		}
 	}
+	if consolePluginsObject, ok := entityObject["plugins"].(map[string]interface{}); ok {
+		if err = PlainConsolePluginToObject(&console, consolePluginsObject); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func PlainConsolePluginToObject(console *Console, consolePluginsObject map[string]interface{}) (err error) {
+	for pluginKey, pluginValue := range consolePluginsObject {
+		var consolePlugin ConsolePlugin
+		consolePlugin, err = ConsolePluginFromJSON(pluginKey)
+		console.Plugins = append(console.Plugins, consolePlugin)
+		consolePluginObject := pluginValue.(map[string]interface{})
+		if len(consolePluginObject) > 0 {
+			consolePluginCollectionPath := consolePluginObject["collection_path"]
+			consolePluginDestination := consolePluginObject["destination"]
+			consolePluginFilesArray := consolePluginObject["files"].([]interface{})
+			for fileIndex := 0; fileIndex < len(consolePluginFilesArray); fileIndex++ {
+				var consolePluginCollectionPathValue interface{}
+				if consolePluginCollectionPathObject, ok := consolePluginCollectionPath.([]interface{}); ok {
+					consolePluginCollectionPathValue = consolePluginCollectionPathObject[fileIndex]
+				} else {
+					consolePluginCollectionPathValue = consolePluginCollectionPath
+				}
+				var consolePluginDestinationValue interface{}
+				if consolePluginDestinationObject, ok := consolePluginDestination.([]interface{}); ok {
+					consolePluginDestinationValue = consolePluginDestinationObject[fileIndex]
+				} else {
+					consolePluginDestinationValue = consolePluginDestination
+				}
+				var consolePluginsFile ConsolePluginsFile
+				if consolePluginsFile, err = ConsolePluginsFileFromJSON(
+					consolePluginCollectionPathValue,
+					consolePluginDestinationValue,
+					consolePluginFilesArray[fileIndex].(string)); err != nil {
+					return
+				}
+				consolePlugin.Files = append(consolePlugin.Files, consolePluginsFile)
+			}
+		}
+	}
+	return
+}
+
+func PlainConsoleLanguageToObject(console *Console, consoleLanguageObject map[string]interface{}) (err error) {
+	consoleLanguageMappingObject, _ := consoleLanguageObject["mapping"].(map[string]interface{})
+	for languageIDKey, languageIDValue := range consoleLanguageMappingObject {
+		for _, languageEntry := range languageIDValue.([]interface{}) {
+			var languageID uint64
+			if languageID, err = strconv.ParseUint(languageIDKey, 10, 32); err != nil {
+				return
+			}
+			var consoleLanguage ConsoleLanguage
+			if consoleLanguage, err = ConsoleLanguageFromJSON(uint(languageID), languageEntry.(string)); err != nil {
+				return
+			}
+			console.Languages = append(console.Languages, consoleLanguage)
+		}
+	}
+	return
+}
+
+func PlainConsoleConfigToObject(console *Console, entityObject map[string]interface{}) (err error) {
 	for levelKey, levelValue := range entityObject {
 		if ConsoleConfigIsLevel(levelKey) {
 			consoleLevelObject := levelValue.(map[string]interface{})
@@ -88,55 +154,17 @@ func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err
 			}
 		}
 	}
-	if consoleLanguageObject, ok := entityObject["language"].(map[string]interface{}); ok {
-		consoleLanguageMappingObject, _ := consoleLanguageObject["mapping"].(map[string]interface{})
-		for languageIDKey, languageIDValue := range consoleLanguageMappingObject {
-			for _, languageEntry := range languageIDValue.([]interface{}) {
-				var languageID uint64
-				if languageID, err = strconv.ParseUint(languageIDKey, 10, 32); err != nil {
-					return
-				}
-				var consoleLanguage ConsoleLanguage
-				if consoleLanguage, err = ConsoleLanguageFromJSON(uint(languageID), languageEntry.(string)); err != nil {
-					return
-				}
-				console.Languages = append(console.Languages, consoleLanguage)
+	return
+}
+
+func PlainConsoleFileTypesToObject(console *Console, consoleFileTypesObject map[string]interface{}) (err error) {
+	for actionKey, actionValue := range consoleFileTypesObject {
+		for _, fileType := range actionValue.([]interface{}) {
+			var consoleFileType ConsoleFileType
+			if consoleFileType, err = ConsoleFileTypeFromJSON(actionKey, fileType.(string)); err != nil {
+				return err
 			}
-		}
-	}
-	if consolePluginsObject, ok := entityObject["plugins"].(map[string]interface{}); ok {
-		for pluginKey, pluginValue := range consolePluginsObject {
-			var consolePlugin ConsolePlugin
-			consolePlugin, err = ConsolePluginFromJSON(pluginKey)
-			console.Plugins = append(console.Plugins, consolePlugin)
-			consolePluginObject := pluginValue.(map[string]interface{})
-			if len(consolePluginObject) > 0 {
-				consolePluginCollectionPath := consolePluginObject["collection_path"]
-				consolePluginDestination := consolePluginObject["destination"]
-				consolePluginFilesArray := consolePluginObject["files"].([]interface{})
-				for fileIndex := 0; fileIndex < len(consolePluginFilesArray); fileIndex++ {
-					var consolePluginCollectionPathValue interface{}
-					if consolePluginCollectionPathObject, ok := consolePluginCollectionPath.([]interface{}); ok {
-						consolePluginCollectionPathValue = consolePluginCollectionPathObject[fileIndex]
-					} else {
-						consolePluginCollectionPathValue = consolePluginCollectionPath
-					}
-					var consolePluginDestinationValue interface{}
-					if consolePluginDestinationObject, ok := consolePluginDestination.([]interface{}); ok {
-						consolePluginDestinationValue = consolePluginDestinationObject[fileIndex]
-					} else {
-						consolePluginDestinationValue = consolePluginDestination
-					}
-					var consolePluginsFile ConsolePluginsFile
-					if consolePluginsFile, err = ConsolePluginsFileFromJSON(
-						consolePluginCollectionPathValue,
-						consolePluginDestinationValue,
-						consolePluginFilesArray[fileIndex].(string)); err != nil {
-						return
-					}
-					consolePlugin.Files = append(consolePlugin.Files, consolePluginsFile)
-				}
-			}
+			console.FileTypes = append(console.FileTypes, consoleFileType)
 		}
 	}
 	return

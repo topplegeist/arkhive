@@ -5,13 +5,20 @@ import (
 	"testing"
 
 	"arkhive.dev/launcher/internal/engine"
-	"arkhive.dev/launcher/internal/gui"
 	"github.com/stretchr/testify/assert"
 )
 
+type MockHandler struct {
+	IsStarted bool
+}
+
+func (mockHandler *MockHandler) NotifyStarted() {
+	mockHandler.IsStarted = true
+}
+
 func TestInitializeNoEngines(t *testing.T) {
 	engines := make([]engine.ApplicationEngine, 0)
-	handler := gui.MockHandler{}
+	handler := MockHandler{}
 	controller := engine.NewController(engines, &handler)
 	controller.Initialize()
 	assert.True(t, handler.IsStarted, "The mock GUI not notifies the start")
@@ -25,7 +32,7 @@ func TestInitialize(t *testing.T) {
 		engines[engineIndex] = &MockEngine{Index: engineIndex}
 	}
 
-	handler := gui.MockHandler{}
+	handler := MockHandler{}
 
 	controller := engine.NewController(engines, &handler)
 	controller.Initialize()

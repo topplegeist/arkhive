@@ -1,3 +1,7 @@
+/*
+The configuration loader, read from environment variables or configuration file
+in YAML format.
+*/
 package configloader
 
 import (
@@ -10,7 +14,7 @@ import (
 // Structure to bind application parameters
 type Config struct {
 	LogLevel string `mapstructure:"LOG_LEVEL"` // logrus library log level to be assigned
-	BasePath string `mapstructure:"BASE_PATH"` // logrus library log level to be assigned
+	BasePath string `mapstructure:"BASE_PATH"` // application base path
 }
 
 // Initialize default parameters values
@@ -30,10 +34,11 @@ func LoadConfiguration(applicationName string, configurationFilePath string) (co
 			root = string(filepath.Separator)
 		}
 
-		// Set configuration named config from etc/*appName*, $HOME/.*appName* or current folders
+		// Set configuration named config from /etc/*appName*, $HOME/.*appName* or current folders
 		viper.AddConfigPath(filepath.Join(root, "etc", applicationName))
 		viper.AddConfigPath(filepath.Join("$HOME", "."+applicationName))
 		viper.AddConfigPath(".")
+
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 	} else {

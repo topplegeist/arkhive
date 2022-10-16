@@ -23,3 +23,12 @@ func TestImportSameImportedHash(t *testing.T) {
 	assert.Nil(t, value)
 	assert.Nil(t, err)
 }
+
+func TestImport(t *testing.T) {
+	currentHash := make([]byte, 20)
+	hex.Decode(currentHash, []byte("fa9ada43da1797362c5f3e3ec1f8a5cbbf9a8a35"))
+	i := importer.NewPlainImporter("../../../test/invalid_database")
+	value, err := i.Import(currentHash)
+	assert.Nil(t, value)
+	assert.Nil(t, err)
+}

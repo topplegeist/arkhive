@@ -7,7 +7,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"reflect"
 
 	"github.com/sirupsen/logrus"
 )
@@ -41,13 +40,6 @@ func (p *PlainImporter) Import(currentDBHash []byte) (importedDBHash []byte, err
 		return
 	}
 
-	// Return the database file if the database has never been imported and if the hash stored in the database is different from that taken from the current file
-	if reflect.DeepEqual(currentDBHash, importedDBHash) {
-		logrus.Info("No database updates")
-		return nil, nil
-	}
-
-	logrus.Info("The encrypted database hash does not match the one stored into the local database. Updating the local database")
 	if err = p.decode(databaseData); err != nil {
 		return
 	}

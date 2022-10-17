@@ -77,8 +77,13 @@ func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err
 	if err = PlainConsoleConfigToObject(&console, entityObject); err != nil {
 		return
 	}
-	if consoleLanguageObject, ok := entityObject["language"].(map[string]interface{}); ok {
-		if err = PlainConsoleLanguageToObject(&console, consoleLanguageObject); err != nil {
+	if consoleLanguageObjectInterface, ok := entityObject["language"]; ok {
+		if consoleLanguageObject, ok := consoleLanguageObjectInterface.(map[string]interface{}); ok {
+			if err = PlainConsoleLanguageToObject(&console, consoleLanguageObject); err != nil {
+				return
+			}
+		} else {
+			err = errors.New("cannot parse language")
 			return
 		}
 	}

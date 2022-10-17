@@ -6,6 +6,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPlainDatabaseToConsoleInvalidJson(t *testing.T) {
+	if _, err := PlainDatabaseToConsole("consoleSlug", []string{}); err == nil {
+		t.Fail()
+	} else {
+		assert.Error(t, err, "the console JSON is not an object")
+	}
+}
+
+func TestPlainDatabaseToConsoleIncompleteJson(t *testing.T) {
+	if _, err := PlainDatabaseToConsole("consoleSlug", map[string]interface{}{}); err == nil {
+		t.Fail()
+	}
+}
+
+func TestPlainDatabaseToConsoleStrictValuesNoFileTypes(t *testing.T) {
+	if _, err := PlainDatabaseToConsole("consoleSlug", map[string]interface{}{
+		"name":          "name",
+		"core_location": "core_location",
+	}); err == nil {
+		t.Fail()
+	}
+}
+
 func TestPlainDatabaseToConsole(t *testing.T) {
 	var (
 		entity Console

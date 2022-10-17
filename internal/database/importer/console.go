@@ -66,8 +66,12 @@ func PlainDatabaseToConsole(slug string, json interface{}) (console Console, err
 	if console, err = ConsoleFromJSON(slug, entityObject); err != nil {
 		return
 	}
-	consoleFileTypesObject, _ := entityObject["file_types"].(map[string]interface{})
-	if err = PlainConsoleFileTypesToObject(&console, consoleFileTypesObject); err != nil {
+	if consoleFileTypesObject, ok := entityObject["file_types"].(map[string]interface{}); ok {
+		if err = PlainConsoleFileTypesToObject(&console, consoleFileTypesObject); err != nil {
+			return
+		}
+	} else {
+		err = errors.New("the console JSON not contains file types")
 		return
 	}
 	if err = PlainConsoleConfigToObject(&console, entityObject); err != nil {
@@ -178,12 +182,38 @@ func ConsoleFromJSON(slug string, json map[string]interface{}) (instance Console
 			languageVariableName = &languageVariableNameVariable
 		}
 	}
+	var (
+		coreLocation string
+		name         string
+		singleFile   bool = true
+		isEmbedded   bool = false
+	)
+
+	if value, ok := json["core_location"]; ok {
+		coreLocation = value.(string)
+	} else {
+		err = errors.New("cannot parse core_location")
+		return
+	}
+	if value, ok := json["name"]; ok {
+		name = value.(string)
+	} else {
+		err = errors.New("cannot parse name")
+		return
+	}
+	if value, ok := json["single_file"]; ok {
+		singleFile = value.(bool)
+	}
+	if value, ok := json["is_embedded"]; ok {
+		isEmbedded = value.(bool)
+	}
+
 	instance = Console{
 		slug,
-		json["core_location"].(string),
-		json["name"].(string),
-		json["single_file"].(bool),
-		json["is_embedded"].(bool),
+		coreLocation,
+		name,
+		singleFile,
+		isEmbedded,
 		languageVariableName,
 		[]ConsolePlugin{},
 		[]ConsoleFileType{},

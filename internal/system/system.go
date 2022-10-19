@@ -18,13 +18,11 @@ import (
 	"sync"
 
 	"arkhive.dev/launcher/internal/buildbot"
-	"arkhive.dev/launcher/internal/console"
 	"arkhive.dev/launcher/internal/database"
 	"arkhive.dev/launcher/internal/folder"
 	"arkhive.dev/launcher/internal/network"
 	"arkhive.dev/launcher/internal/network/resources"
 	"arkhive.dev/launcher/internal/osconstants"
-	"arkhive.dev/launcher/internal/tool"
 	"arkhive.dev/launcher/internal/undertow"
 	"github.com/BurntSushi/toml"
 	"github.com/sirupsen/logrus"

@@ -10,61 +10,31 @@ Here we suggest to setup a development environment based on Visual Studio Code a
 
 - C/C++ (VSCode extension) - Allow C/C++
 - change-case (VSCode extension) - Quickly change variable cases
-- Clang-Format (VSCode extension) - Format C++ code
-- CMake - Colorize CMake files
-- CMake Tools - Simplify CMake target launch
-- Copy filename - Easly copy file names
 - Git Graph - Show git branch tree
-- GitLens - Enhance VSCode git integration
 - markdownlint - md files checking tool
 - Prettier - Code Formatter - Format any other codes
-- Qt for Python - Colorize qml and other Qt specific files
 - Todo Tree - Search through code for to do comments
 
-You should disable CMake Tools (Extension) from the bottom bar as long as it doesn't run the build process correctly.
+## Launch test
+
+```shell
+go test ./...
+```
 
 ## How to build
 
 arkHive currently supports both Windows and Linux.
 
-- Start cloning the git repository
+Clone the git repository and build the main file
 
-```bash
+```shell
 git clone <repository_url>
-git submodule update --init --recursive
+go build cmd/arkhivelib/main.go
 ```
-
-### Windows dependencies
-
-- Download VC++ 2017 version 15.9 v14.16 latest v141 tools
-- Download and install Qt Framework 5.14.2
-- Set the Qt install directory as `QT_BASE` environment variable
-- Set the Qt install directory followed by `5.14.2\msvc2017_64\lib\cmake` as `Qt5_DIR` environment variable
-- Add the Qt install directory followed by `5.14.2\msvc2017_64\bin` in your `PATH` environment variable
-- Download and install Boost 1.74.0 built with MSVC 14.1 x64 [boost_1_74_0-msvc-14.1-64.exe](https://bintray.com/boostorg/release/download_file?file_path=1.74.0%2Fbinaries%2Fboost_1_74_0-msvc-14.1-64.exe)
-- Open `cmd` or `powershell`
-- Execute `bootstrap.bat` from Boost install directory
-- Set the boost install directory as `BOOST_ROOT` environment variable
-- Install CMake [cmake-3.17.1-win64-x64.msi](https://github.com/Kitware/CMake/releases/download/v3.17.1/cmake-3.17.1-win64-x64.msi)
-- Install node.js [node-v14.15.4-x64.msi](https://nodejs.org/dist/v14.15.4/node-v14.15.4-x64.msi)
-- Add the node.js install directory in your `PATH` environment variable
-- Install ImageMagick [ImageMagick-7.0.10-58-Q16-HDRI-x64-dll.exe](https://download.imagemagick.org/ImageMagick/download/binaries/ImageMagick-7.0.10-58-Q16-HDRI-x64-dll.exe)
-- Add the ImageMagick install directory in your `PATH` environment variable
-- Load the cloned folder in VS Code.
-- Run the `Launch` configuration to build and debug the application.
-
-### Linux dependencies
-
-- Download and install Qt Framework and Qt Creator
-- Download the following dependencies: `cmake`, `p7zip-full`, `ecm`, `libgl1-mesa-dev`, `libboost-all-dev`, `libsdl-net1.2`, `imagemagick`, `nodejs`
-- Download and install RetroArch (on APT: `sudo add-apt-repository ppa:libretro/stable && sudo apt-get update && sudo apt-get install retroarch*`)
-- Add `export CMAKE_PREFIX_PATH=/home/<user>/Qt/5.15.2/gcc_64/` in your `.bashrc` file
-- Load the cloned folder in VS Code.
-- Run the `Launch` configuration to build and debug the application.
 
 ## Database schema description
 
-The database file, once decrypted, is a plain JSON object in a file.
+The exported database file, once decrypted, is a plain JSON object in a file.
 
 It's composed by this sections:
 
@@ -150,21 +120,9 @@ The games area describes the games list in arkHive that can be downloaded and la
 | `additional_files` | Yes | JSON array containing base64 representation of files to be written after the download elaboration.<br>Every additional file to be created is composed by an object with a `name` key, representing the file name, and a `base64` key, representing the bese64-encoded content. | `[`<br>`   {`<br>`      "base64": "BQAAAP//AwADAAAAAAAgAgAAIAIAAAEAAQAAAA==",`<br>`      "name": "CONFIG.DAT"`<br>`   }`<br>`]` |
 | `collection_path` | Yes | Relative path of the elaboration file in a package containing multiple game packages.<br>If the downloaded package is a collection of packages or if it's a torrent/magnet containing multiple packages, this variable points to the package of interest. | `"RomCollection/prince_of_persia.zip"` |
 
-### Others
+### win_tools
 
-Finally temporary settings could be configured. This section describes object and values dinamically changed by arkHive.
-
-#### bee_info
-
-```json
-"bee_info": {
-  "hash": "MD5 representation of the crypted db"
-}
-```
-
-#### win_tools
-
-Every tool is stored inside the `"win_tools"` object as follow:
+Every external tool that is not an application dependency is stored inside the `"win_tools"` object as follow:
 
 ```json
 "entry_slug": {
@@ -173,13 +131,3 @@ Every tool is stored inside the `"win_tools"` object as follow:
   "collection_path": "(optional) Relative directory where to get the tool in the collection file."
 }
 ```
-
-## Portable release
-
-To create a portable .zip file with the launcher, navigate to the root of the project and run:
-
-```bash
-cmake --build build --config Release --target deployLauncher
-```
-
-If the release is successfully built, the result path is displayed as the last sentence of the process.

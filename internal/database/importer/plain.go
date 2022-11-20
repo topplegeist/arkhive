@@ -13,15 +13,15 @@ import (
 
 const PlainDatabasePath = "db.json"
 
-type PlainImporter struct {
+type Plain struct {
 	basePath string
 	consoles []Console
 	games    []Game
 	tools    []Tool
 }
 
-func NewPlainImporter(basePath string) *PlainImporter {
-	return &PlainImporter{
+func NewPlain(basePath string) *Plain {
+	return &Plain{
 		basePath: basePath,
 		consoles: []Console{},
 		games:    []Game{},
@@ -29,7 +29,7 @@ func NewPlainImporter(basePath string) *PlainImporter {
 	}
 }
 
-func (p *PlainImporter) Import(currentDBHash []byte) (importedDBHash []byte, err error) {
+func (p *Plain) Import(currentDBHash []byte) (importedDBHash []byte, err error) {
 	if !p.canLoad() {
 		logrus.Debug("The plain database is not present")
 		return nil, nil
@@ -47,14 +47,14 @@ func (p *PlainImporter) Import(currentDBHash []byte) (importedDBHash []byte, err
 	return
 }
 
-func (p *PlainImporter) canLoad() bool {
+func (p *Plain) canLoad() bool {
 	// Check if a plain database file and the key file exists
 	logrus.Debug("Checking if a plain database could be imported")
 	_, existenceFlag := os.Stat(filepath.Join(p.basePath, PlainDatabasePath))
 	return !os.IsNotExist(existenceFlag)
 }
 
-func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encryptedDBHash []byte, err error) {
+func (p *Plain) load(currentDBHash []byte) (databaseData []byte, encryptedDBHash []byte, err error) {
 	// Read the database file to be imported
 	var plainDatabaseFileReader *os.File
 	if plainDatabaseFileReader, err = os.Open(filepath.Join(p.basePath, PlainDatabasePath)); err != nil {
@@ -80,7 +80,7 @@ func (p *PlainImporter) load(currentDBHash []byte) (databaseData []byte, encrypt
 	return
 }
 
-func (p *PlainImporter) decode(databaseData []byte) (err error) {
+func (p *Plain) decode(databaseData []byte) (err error) {
 	decoder := json.NewDecoder(bytes.NewReader(databaseData))
 	decoder.UseNumber()
 	var database map[string]interface{}
@@ -143,14 +143,14 @@ func (p *PlainImporter) decode(databaseData []byte) (err error) {
 	return
 }
 
-func (p PlainImporter) GetConsoles() (consoles []Console) {
+func (p Plain) GetConsoles() (consoles []Console) {
 	return p.consoles
 }
 
-func (p PlainImporter) GetGames() (games []Game) {
+func (p Plain) GetGames() (games []Game) {
 	return p.games
 }
 
-func (p PlainImporter) GetTools() (tools []Tool) {
+func (p Plain) GetTools() (tools []Tool) {
 	return p.tools
 }

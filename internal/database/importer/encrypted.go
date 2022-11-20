@@ -17,13 +17,13 @@ const EncryptedDatabasePath = "db.honey"
 const DatabaseKeyPath = "private_key.bee"
 
 type EncryptedImporter struct {
-	plainImporter PlainImporter
-	basePath      string
+	Plain    Plain
+	basePath string
 }
 
 func NewEncryptedImporter(basePath string) *EncryptedImporter {
 	return &EncryptedImporter{
-		PlainImporter{
+		Plain{
 			basePath: basePath,
 			consoles: []Console{},
 			games:    []Game{},
@@ -91,7 +91,7 @@ func (e *EncryptedImporter) Import(currentDBHash []byte) (importedDBHash []byte,
 		if _, err = plainDatabaseFile.Write(databaseData); err != nil {
 			return
 		}
-		if _, err = e.plainImporter.Import(currentDBHash); err != nil {
+		if _, err = e.Plain.Import(currentDBHash); err != nil {
 			return
 		}
 		importedDBHash = encryptedDBHash
@@ -112,11 +112,11 @@ func (e *EncryptedImporter) canLoad() bool {
 }
 
 func (e *EncryptedImporter) GetConsoles() []Console {
-	return e.plainImporter.GetConsoles()
+	return e.Plain.GetConsoles()
 }
 func (e *EncryptedImporter) GetGames() []Game {
-	return e.plainImporter.GetGames()
+	return e.Plain.GetGames()
 }
 func (e *EncryptedImporter) GetTools() []Tool {
-	return e.plainImporter.GetTools()
+	return e.Plain.GetTools()
 }

@@ -15,7 +15,7 @@ type Console struct {
 	IsEmbedded           bool `gorm:"not null"`
 }
 
-func (d *SQLiteDelegate) storeImportedConsole(importedEntity importer.Console) (err error) {
+func (d *SQLite) storeImportedConsole(importedEntity importer.Console) (err error) {
 	languageVariableName := sql.NullString{}
 	if importedEntity.LanguageVariableName != nil {
 		languageVariableName.Valid = true
@@ -61,7 +61,7 @@ func (d *SQLiteDelegate) storeImportedConsole(importedEntity importer.Console) (
 	return
 }
 
-func (d *SQLiteDelegate) GetConsoles() (entity []Console, err error) {
+func (d *SQLite) GetConsoles() (entity []Console, err error) {
 	if result := d.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return
@@ -69,7 +69,7 @@ func (d *SQLiteDelegate) GetConsoles() (entity []Console, err error) {
 	return
 }
 
-func (d *SQLiteDelegate) GetConsoleByConsolePlugin(consolePlugin *ConsolePlugin) (model Console, err error) {
+func (d *SQLite) GetConsoleByConsolePlugin(consolePlugin *ConsolePlugin) (model Console, err error) {
 	err = d.database.Model(consolePlugin).Association("Console").Find(&model)
 	return
 }

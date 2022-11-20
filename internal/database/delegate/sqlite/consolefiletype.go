@@ -8,7 +8,7 @@ type ConsoleFileType struct {
 	Action    string `gorm:"not null"`
 }
 
-func (d *SQLiteDelegate) storeImportedConsoleFileType(consoleId string, importedEntity importer.ConsoleFileType) (err error) {
+func (d *SQLite) storeImportedConsoleFileType(consoleId string, importedEntity importer.ConsoleFileType) (err error) {
 	entity := ConsoleFileType{
 		ConsoleID: consoleId,
 		FileType:  importedEntity.FileType,
@@ -22,7 +22,7 @@ func (d *SQLiteDelegate) storeImportedConsoleFileType(consoleId string, imported
 	return
 }
 
-func (d *SQLiteDelegate) GetConsoleFileTypes() (entity []ConsoleFileType, err error) {
+func (d *SQLite) GetConsoleFileTypes() (entity []ConsoleFileType, err error) {
 	if result := d.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return

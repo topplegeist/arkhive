@@ -5,7 +5,7 @@ type ToolFilesType struct {
 	Type   string `gorm:"not null"`
 }
 
-func (d *SQLiteDelegate) storeImportedToolFilesType(slug string, toolType string) (err error) {
+func (d *SQLite) storeImportedToolFilesType(slug string, toolType string) (err error) {
 	entity := ToolFilesType{
 		slug,
 		toolType,
@@ -17,7 +17,7 @@ func (d *SQLiteDelegate) storeImportedToolFilesType(slug string, toolType string
 	return
 }
 
-func (databaseEngine *SQLiteDelegate) GetToolFileTypes() (entity []ToolFilesType, err error) {
+func (databaseEngine *SQLite) GetToolFileTypes() (entity []ToolFilesType, err error) {
 	if result := databaseEngine.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return

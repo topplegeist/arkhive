@@ -16,7 +16,7 @@ func clearTestEnvironment() {
 
 func TestOpenAndClose(t *testing.T) {
 	clearTestEnvironment()
-	s := sqlite.SQLiteDelegate{
+	s := sqlite.SQLite{
 		BasePath: TEST_FOLDER_PATH,
 	}
 	if err := s.Open(); err != nil {
@@ -29,7 +29,7 @@ func TestOpenAndClose(t *testing.T) {
 
 func TestOpenAfterFirstCreation(t *testing.T) {
 	clearTestEnvironment()
-	s := sqlite.SQLiteDelegate{
+	s := sqlite.SQLite{
 		BasePath: TEST_FOLDER_PATH,
 	}
 	if err := s.Open(); err != nil {
@@ -47,7 +47,7 @@ func TestOpenAfterFirstCreation(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	clearTestEnvironment()
-	s := sqlite.SQLiteDelegate{
+	s := sqlite.SQLite{
 		BasePath: TEST_FOLDER_PATH,
 	}
 	if err := s.Open(); err != nil {
@@ -64,7 +64,7 @@ func TestMigrate(t *testing.T) {
 
 func TestFailMigration(t *testing.T) {
 	clearTestEnvironment()
-	s := sqlite.SQLiteDelegate{
+	s := sqlite.SQLite{
 		BasePath: TEST_FOLDER_PATH,
 	}
 	if err := s.Migrate(); err == nil {
@@ -73,7 +73,7 @@ func TestFailMigration(t *testing.T) {
 }
 
 func TestFailClose(t *testing.T) {
-	s := sqlite.SQLiteDelegate{
+	s := sqlite.SQLite{
 		BasePath: TEST_FOLDER_PATH,
 	}
 	if err := s.Close(); err == nil {
@@ -83,7 +83,7 @@ func TestFailClose(t *testing.T) {
 
 func TestStoreImportedEmpty(t *testing.T) {
 	clearTestEnvironment()
-	s := sqlite.SQLiteDelegate{
+	s := sqlite.SQLite{
 		BasePath: TEST_FOLDER_PATH,
 	}
 	if err := s.Open(); err != nil {

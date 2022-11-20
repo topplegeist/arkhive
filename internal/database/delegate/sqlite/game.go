@@ -18,7 +18,7 @@ type Game struct {
 	InsertionDate   time.Time `gorm:"autoCreateTime;not null"`
 }
 
-func (d *SQLiteDelegate) storeImportedGame(importedEntity importer.Game) (err error) {
+func (d *SQLite) storeImportedGame(importedEntity importer.Game) (err error) {
 	backgroundImage := sql.NullString{}
 	if importedEntity.BackgroundImage != nil {
 		backgroundImage.Valid = true
@@ -67,7 +67,7 @@ func (d *SQLiteDelegate) storeImportedGame(importedEntity importer.Game) (err er
 	return
 }
 
-func (d *SQLiteDelegate) GetGames() (entity []Game, err error) {
+func (d *SQLite) GetGames() (entity []Game, err error) {
 	if result := d.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return

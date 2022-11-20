@@ -17,7 +17,7 @@ type ConsoleTestFlags struct {
 
 func storeImportedConsoleTestProthotype(t *testing.T, flags ConsoleTestFlags) {
 	clearTestEnvironment()
-	s := sqlite.SQLiteDelegate{
+	s := sqlite.SQLite{
 		BasePath: TEST_FOLDER_PATH,
 	}
 	if err := s.Open(); err != nil {

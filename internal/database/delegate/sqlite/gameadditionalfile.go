@@ -8,7 +8,7 @@ type GameAdditionalFile struct {
 	Data   []byte `gorm:"not null"`
 }
 
-func (d *SQLiteDelegate) storeImportedGameAdditionalFile(slug string, importedEntity importer.GameAdditionalFile) (err error) {
+func (d *SQLite) storeImportedGameAdditionalFile(slug string, importedEntity importer.GameAdditionalFile) (err error) {
 	entity := GameAdditionalFile{
 		slug,
 		importedEntity.Name,
@@ -22,7 +22,7 @@ func (d *SQLiteDelegate) storeImportedGameAdditionalFile(slug string, importedEn
 	return
 }
 
-func (d *SQLiteDelegate) GetGameAdditionalFiles() (entity []GameAdditionalFile, err error) {
+func (d *SQLite) GetGameAdditionalFiles() (entity []GameAdditionalFile, err error) {
 	if result := d.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return

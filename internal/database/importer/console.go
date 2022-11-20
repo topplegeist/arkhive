@@ -133,19 +133,23 @@ func PlainConsolePluginToObject(console *Console, consolePluginsObject map[strin
 }
 
 func PlainConsoleLanguageToObject(console *Console, consoleLanguageObject map[string]interface{}) (err error) {
-	consoleLanguageMappingObject, _ := consoleLanguageObject["mapping"].(map[string]interface{})
+	var (
+		consoleLanguageMappingObject map[string]string
+		ok                           bool
+	)
+	if consoleLanguageMappingObject, ok = consoleLanguageObject["mapping"].(map[string]string); !ok {
+		return errors.New("cannot parse language map")
+	}
 	for languageIDKey, languageIDValue := range consoleLanguageMappingObject {
-		for _, languageEntry := range languageIDValue.([]interface{}) {
-			var languageID uint64
-			if languageID, err = strconv.ParseUint(languageIDKey, 10, 32); err != nil {
-				return
-			}
-			var consoleLanguage ConsoleLanguage
-			if consoleLanguage, err = ConsoleLanguageFromJSON(uint(languageID), languageEntry.(string)); err != nil {
-				return
-			}
-			console.Languages = append(console.Languages, consoleLanguage)
+		var languageID uint64
+		if languageID, err = strconv.ParseUint(languageIDKey, 10, 32); err != nil {
+			return
 		}
+		var consoleLanguage ConsoleLanguage
+		if consoleLanguage, err = ConsoleLanguageFromJSON(uint(languageID), languageIDValue); err != nil {
+			return
+		}
+		console.Languages = append(console.Languages, consoleLanguage)
 	}
 	return
 }

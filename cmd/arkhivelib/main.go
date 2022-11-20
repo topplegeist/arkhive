@@ -6,6 +6,8 @@ import (
 	"runtime/debug"
 
 	"arkhive.dev/launcher/internal/configloader"
+	"arkhive.dev/launcher/internal/database"
+	"arkhive.dev/launcher/internal/database/delegate"
 	"arkhive.dev/launcher/internal/engine"
 	"arkhive.dev/launcher/internal/gui"
 	"arkhive.dev/launcher/internal/launcher"
@@ -108,7 +110,7 @@ func logBuildInformation() {
 func runEngines(configuration configloader.Config) {
 	var engines []engine.ApplicationEngine = make([]engine.ApplicationEngine, EnginesCount)
 	// The application entities data
-	//engines[Database] = database.NewDatabaseEngine(configuration.BasePath)
+	engines[Database] = database.NewDatabase(&delegate.DatabaseDelegate().BasePath)
 	// The handler of the communication
 	engines[Network], _ = network.NewNetworkEngine()
 	// The operative systems and hardware adapter

@@ -9,7 +9,7 @@ type ConsoleConfig struct {
 	Level     string `gorm:"not null"`
 }
 
-func (d *SQLiteDelegate) storeImportedConsoleConfig(consoleId string, importedEntity importer.ConsoleConfig) (err error) {
+func (d *SQLite) storeImportedConsoleConfig(consoleId string, importedEntity importer.ConsoleConfig) (err error) {
 	entity := ConsoleConfig{
 		ConsoleID: consoleId,
 		Name:      importedEntity.Name,
@@ -24,7 +24,7 @@ func (d *SQLiteDelegate) storeImportedConsoleConfig(consoleId string, importedEn
 	return
 }
 
-func (d *SQLiteDelegate) GetConsoleConfigs() (entity []ConsoleConfig, err error) {
+func (d *SQLite) GetConsoleConfigs() (entity []ConsoleConfig, err error) {
 	if result := d.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return

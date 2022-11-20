@@ -38,8 +38,8 @@ type SystemEngine struct {
 	networkEngine        network.NetworkEngine
 	settings             map[string]interface{}
 	preparingConsoleList []ConsoleEntryDownload
-	preparingToolsList   []tool.Tool
-	preparingPluginsList []console.ConsolePlugin
+	preparingToolsList   []Tool
+	preparingPluginsList []ConsolePlugin
 	extractingExtensions []string
 }
 

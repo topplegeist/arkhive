@@ -14,7 +14,7 @@ type ToolTestFlags struct {
 
 func storeImportedToolTestProthotype(t *testing.T, flags ToolTestFlags) {
 	clearTestEnvironment()
-	s := sqlite.SQLiteDelegate{
+	s := sqlite.SQLite{
 		BasePath: TEST_FOLDER_PATH,
 	}
 	if err := s.Open(); err != nil {

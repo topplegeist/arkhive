@@ -10,7 +10,7 @@ type GameConfig struct {
 	Value  string `gorm:"not null"`
 }
 
-func (d *SQLiteDelegate) storeImportedGameConfig(slug string, importedEntity importer.GameConfig) (err error) {
+func (d *SQLite) storeImportedGameConfig(slug string, importedEntity importer.GameConfig) (err error) {
 	entity := GameConfig{
 		slug,
 		importedEntity.Name,
@@ -24,7 +24,7 @@ func (d *SQLiteDelegate) storeImportedGameConfig(slug string, importedEntity imp
 	return
 }
 
-func (d *SQLiteDelegate) GetGameConfigs() (entity []GameConfig, err error) {
+func (d *SQLite) GetGameConfigs() (entity []GameConfig, err error) {
 	if result := d.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return

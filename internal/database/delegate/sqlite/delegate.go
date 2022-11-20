@@ -14,12 +14,12 @@ import (
 
 const DatabasePath = "data.sqllite3"
 
-type SQLiteDelegate struct {
+type SQLite struct {
 	database *gorm.DB
 	BasePath string
 }
 
-func (s *SQLiteDelegate) Open() (err error) {
+func (s *SQLite) Open() (err error) {
 	databasePath := filepath.Join(s.BasePath, DatabasePath)
 	if err = os.MkdirAll(filepath.Dir(databasePath), 0755); err != nil {
 		return
@@ -33,7 +33,7 @@ func (s *SQLiteDelegate) Open() (err error) {
 	return
 }
 
-func (d *SQLiteDelegate) Migrate() (err error) {
+func (d *SQLite) Migrate() (err error) {
 	if d.database == nil {
 		return errors.New("no database instance")
 	}
@@ -45,7 +45,7 @@ func (d *SQLiteDelegate) Migrate() (err error) {
 		&GameConfig{}, &UserVariable{})
 }
 
-func (d *SQLiteDelegate) Close() (err error) {
+func (d *SQLite) Close() (err error) {
 	if d.database == nil {
 		return errors.New("no database instance")
 	}
@@ -59,14 +59,14 @@ func (d *SQLiteDelegate) Close() (err error) {
 	return
 }
 
-func (d *SQLiteDelegate) create(value interface{}) error {
+func (d *SQLite) create(value interface{}) error {
 	if result := d.database.Create(value); result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (d *SQLiteDelegate) createOrUpdate(value interface{}) error {
+func (d *SQLite) createOrUpdate(value interface{}) error {
 	if result := d.database.Clauses(clause.OnConflict{
 		UpdateAll: true,
 	}).Create(value); result.Error != nil {
@@ -75,14 +75,14 @@ func (d *SQLiteDelegate) createOrUpdate(value interface{}) error {
 	return nil
 }
 
-func (d *SQLiteDelegate) first(dest interface{}, conds ...interface{}) error {
+func (d *SQLite) first(dest interface{}, conds ...interface{}) error {
 	if result := d.database.First(dest, conds); result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (d *SQLiteDelegate) StoreImported(consoles []importer.Console, games []importer.Game, tools []importer.Tool) (err error) {
+func (d *SQLite) StoreImported(consoles []importer.Console, games []importer.Game, tools []importer.Tool) (err error) {
 	for _, entity := range consoles {
 		if err = d.storeImportedConsole(entity); err != nil {
 			return

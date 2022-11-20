@@ -11,7 +11,7 @@ type UserVariable struct {
 	Value sql.NullString
 }
 
-func (s SQLiteDelegate) GetStoredDBHash() (storedDBHash []byte, err error) {
+func (s SQLite) GetStoredDBHash() (storedDBHash []byte, err error) {
 	var userVariable UserVariable
 	if err = s.first(&userVariable, "name = ?", "dbHash"); err != nil || !userVariable.Value.Valid {
 		storedDBHash = []byte{}
@@ -21,7 +21,7 @@ func (s SQLiteDelegate) GetStoredDBHash() (storedDBHash []byte, err error) {
 	return
 }
 
-func (s SQLiteDelegate) SetStoredDBHash(dbHash []byte) (err error) {
+func (s SQLite) SetStoredDBHash(dbHash []byte) (err error) {
 	storingDBHash := base64.URLEncoding.EncodeToString(dbHash)
 	userVariable := UserVariable{
 		Name: "dbHash",
@@ -36,7 +36,7 @@ func (s SQLiteDelegate) SetStoredDBHash(dbHash []byte) (err error) {
 	return
 }
 
-func (databaseEngine SQLiteDelegate) GetLanguage() (Locale, error) {
+func (databaseEngine SQLite) GetLanguage() (Locale, error) {
 	var userVariable UserVariable
 	if result := databaseEngine.database.First(&userVariable, "name = ?", "language"); result.Error != nil || !userVariable.Value.Valid {
 		return ENGLISH, result.Error

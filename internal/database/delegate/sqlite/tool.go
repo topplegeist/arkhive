@@ -13,7 +13,7 @@ type Tool struct {
 	Destination    sql.NullString
 }
 
-func (d *SQLiteDelegate) storeImportedTool(importedEntity importer.Tool) (err error) {
+func (d *SQLite) storeImportedTool(importedEntity importer.Tool) (err error) {
 	collectionPath := sql.NullString{}
 	if importedEntity.CollectionPath != nil {
 		collectionPath.Valid = true
@@ -43,7 +43,7 @@ func (d *SQLiteDelegate) storeImportedTool(importedEntity importer.Tool) (err er
 	return
 }
 
-func (databaseEngine *SQLiteDelegate) GetTools() (entity []Tool, err error) {
+func (databaseEngine *SQLite) GetTools() (entity []Tool, err error) {
 	if result := databaseEngine.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return

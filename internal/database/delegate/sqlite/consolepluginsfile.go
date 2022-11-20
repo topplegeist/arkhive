@@ -13,7 +13,7 @@ type ConsolePluginsFile struct {
 	CollectionPath  sql.NullString
 }
 
-func (d *SQLiteDelegate) storeImportedConsolePluginsFile(consolePluginId uint, importedEntity importer.ConsolePluginsFile) (err error) {
+func (d *SQLite) storeImportedConsolePluginsFile(consolePluginId uint, importedEntity importer.ConsolePluginsFile) (err error) {
 	destination := sql.NullString{}
 	if importedEntity.Destination != nil {
 		destination.Valid = true
@@ -38,7 +38,7 @@ func (d *SQLiteDelegate) storeImportedConsolePluginsFile(consolePluginId uint, i
 	return
 }
 
-func (d *SQLiteDelegate) GetConsolePluginsFiles() (entity []ConsolePluginsFile, err error) {
+func (d *SQLite) GetConsolePluginsFiles() (entity []ConsolePluginsFile, err error) {
 	if result := d.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return
@@ -46,7 +46,7 @@ func (d *SQLiteDelegate) GetConsolePluginsFiles() (entity []ConsolePluginsFile, 
 	return
 }
 
-func (d *SQLiteDelegate) GetConsolePluginsFilesByConsolePlugin(consolePlugin *ConsolePlugin) (entity []ConsolePluginsFile, err error) {
+func (d *SQLite) GetConsolePluginsFilesByConsolePlugin(consolePlugin *ConsolePlugin) (entity []ConsolePluginsFile, err error) {
 	err = d.database.Model(consolePlugin).Association("ConsolePluginsFiles").Find(&entity)
 	return
 }

@@ -14,7 +14,7 @@ type GameDisk struct {
 	CollectionPath sql.NullString
 }
 
-func (d *SQLiteDelegate) storeImportedGameDisk(slug string, importedEntity importer.GameDisk) (err error) {
+func (d *SQLite) storeImportedGameDisk(slug string, importedEntity importer.GameDisk) (err error) {
 	image := sql.NullString{}
 	if importedEntity.Image != nil {
 		image.Valid = true
@@ -40,7 +40,7 @@ func (d *SQLiteDelegate) storeImportedGameDisk(slug string, importedEntity impor
 	return
 }
 
-func (d *SQLiteDelegate) GetGameDisks() (entity []GameDisk, err error) {
+func (d *SQLite) GetGameDisks() (entity []GameDisk, err error) {
 	if result := d.database.Find(&entity); result.Error != nil {
 		err = result.Error
 		return

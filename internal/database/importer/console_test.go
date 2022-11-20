@@ -42,7 +42,7 @@ func TestPlainDatabaseToConsoleStrictValuesWrongLanguageMap(t *testing.T) {
 		},
 		"language": map[string]interface{}{
 			"variable_name": "variable_name",
-			"mapping":       "mapping",
+			"mapping":       "wrong_mapping_table",
 		},
 	}); err == nil {
 		t.Fail()
@@ -75,9 +75,9 @@ func TestPlainDatabaseToConsole(t *testing.T) {
 			"action1": []interface{}{"file_type1"},
 		},
 		"language": map[string]interface{}{
-			"mapping": map[string]interface{}{
-				"0": []interface{}{"language0"},
-				"1": []interface{}{"language1"},
+			"mapping": map[string]string{
+				"0": "language0",
+				"1": "language1",
 			},
 			"variable_name": "variable_name",
 		},
